@@ -7,7 +7,10 @@ STEP = TypeVar("STEP")
 
 
 class Player(abc.ABC):
-    pass
+    name: str
+
+    def __init__(self, name: str):
+        self.name = name
 
 
 class Team(Player):
