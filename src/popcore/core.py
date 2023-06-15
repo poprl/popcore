@@ -10,6 +10,13 @@ class Player(abc.ABC):
     pass
 
 
+class Team(Player):
+    members: "list[Player]"
+
+    def __init__(self, members: "list[Player]"):
+        self.members = members
+
+
 class Interaction(Generic[OUTCOME]):
     """_summary_
         players: players involved in the game

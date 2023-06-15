@@ -1,3 +1,3 @@
 from .core import ( # noqa
-    Population, Player, Interaction
+    Population, Player, Team, Interaction
 )
