@@ -16,8 +16,9 @@ class Player(abc.ABC):
 class Team(Player):
     members: "list[Player]"
 
-    def __init__(self, members: "list[Player]"):
+    def __init__(self, name: str, members: "list[Player]"):
         self.members = members
+        super().__init__(name)
 
 
 class Interaction(Generic[OUTCOME]):

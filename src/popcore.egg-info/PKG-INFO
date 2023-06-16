@@ -1,0 +1,9 @@
+Metadata-Version: 2.1
+Name: popcore
+Version: 0.1
+Summary: Core
+Home-page: https://www.python.org/sigs/distutils-sig/
+Author: Manfred Diaz
+Author-email: 
+Provides-Extra: dev
+License-File: LICENSE
