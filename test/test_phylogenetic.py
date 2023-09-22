@@ -36,7 +36,7 @@ class TestPhilogenetic(unittest.TestCase):
             node.add_child(model_parameters=new_DNA,
                            hyperparameters=hyperparameters)
 
-        tree.draw()
+        # tree.draw()
 
     def test_reconstruction_from_hyperparam(self):
         tree = PhylogeneticTree(hyperparameters=["letter", "spot"],
