@@ -2,3 +2,6 @@
 networkx
 matplotlib
 pydot
+torch==2.0.1
+numpy==1.25.0
+gym==0.26.2

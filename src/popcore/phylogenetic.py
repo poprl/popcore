@@ -1,6 +1,7 @@
 from typing import List, Dict, Any, Callable
 import string
 import random
+from copy import deepcopy
 
 # Display libraries
 import networkx as nx               # type: ignore
@@ -192,12 +193,13 @@ class PhylogeneticTree:
                 child = PhylogeneticTree.Node(
                     self.tree, self,
                     ID=ID,
-                    hyperparameters=hyperparameters,
+                    hyperparameters=deepcopy(hyperparameters),
                     contributors=contributors,
                     generation=self.generation+1)
             else:
                 child = node
                 child.parent = self
+                child.hyperparameters = deepcopy(hyperparameters)
                 child.set_tree(self.tree)
                 child.set_ID(ID)
                 child.generation = self.generation + 1
@@ -206,7 +208,7 @@ class PhylogeneticTree:
                 self.tree.generations[child.generation - 1].append(self)
 
             if child.get_nbr_unsaved_ancestors() > self.tree.tree_sparsity:
-                child.model_parameters = model_parameters
+                child.model_parameters = deepcopy(model_parameters)
 
             self.children.append(child)
             self.tree.nodes[child.ID] = child
@@ -249,13 +251,13 @@ class PhylogeneticTree:
                 parent_param = self.parent.get_model_parameters(
                     save if recursive else False, recursive)
 
-            model_parameters = self.tree.step_function(
+            model_parameters, _ = self.tree.step_function(
                 parent_param,
                 self.hyperparameters,
                 contributors_param)
 
             if save:
-                self.model_parameters = model_parameters
+                self.model_parameters = deepcopy(model_parameters)
 
             return model_parameters
 
@@ -273,7 +275,7 @@ class PhylogeneticTree:
             return 1 + sum([x.get_nbr_unsaved_ancestors() for x in ancestors])
 
     def __init__(self,
-                 hyperparameters: list[str] = [],
+                 hyperparameter_names: list[str] = [],
                  step_function: Callable = undefined_step,
                  tree_sparsity: int = 100):
         """A phylogenetic tree.
@@ -289,11 +291,11 @@ class PhylogeneticTree:
         technically handle phylogenetic forests.
 
         Args:
-            hyperparameters (list[str]): The list of all the hyperparameters
-                that define the transition from one iteration of an agent to
-                the next. This should contain enough information to reproduce
-                the evolution step deterministically given the parent and
-                contributors parameters.
+            hyperparameter_names (list[str]): The list of all the
+                hyperparameters that define the transition from one iteration
+                of an agent to the next. This should contain enough
+                information to reproduce the evolution step deterministically
+                given the parent and contributors parameters.
                 For example, this could contain
                 ["learning rate", "gamma", "ent-coef", "played as white", ...]
                 Defaults to an empty list.
@@ -323,7 +325,7 @@ class PhylogeneticTree:
 
         # The list of 'roots', i.e. models without ancestors
         self.roots: List[PhylogeneticTree.Node] = []
-        self.hyperparameter_list = hyperparameters
+        self.hyperparameter_list = hyperparameter_names
         self.step_function = step_function
         self.tree_sparsity = tree_sparsity
 
@@ -349,10 +351,11 @@ class PhylogeneticTree:
             PhylogeneticTree.Node: The new node.
         """
 
-        root = PhylogeneticTree.Node(tree=self,
-                                     model_parameters=model_parameters,
-                                     ID=ID,
-                                     force_save=True)
+        root = PhylogeneticTree.Node(
+            tree=self,
+            model_parameters=deepcopy(model_parameters),
+            ID=ID,
+            force_save=True)
         self.roots.append(root)
         self.nodes[root.ID] = root
 
