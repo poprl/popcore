@@ -13,14 +13,17 @@ import numpy as np
 import gym
 
 
-device = torch.device('cpu')
+def set_device():
+    device = torch.device('cpu')
 
-if (torch.cuda.is_available()):
-    device = torch.device('cuda:0')
-    torch.cuda.empty_cache()
-    print("Device set to : " + str(torch.cuda.get_device_name(device)))
-else:
-    print("Device set to : cpu")
+    if (torch.cuda.is_available()):
+        device = torch.device('cuda:0')
+        torch.cuda.empty_cache()
+        print("Device set to : " + str(torch.cuda.get_device_name(device)))
+    else:
+        print("Device set to : cpu")
+
+    return device
 
 
 class RolloutBuffer:
@@ -44,16 +47,18 @@ class RolloutBuffer:
 class ActorCritic(nn.Module):
     def __init__(self, state_dim, action_dim,
                  has_continuous_action_space,
-                 action_std_init):
+                 action_std_init,
+                 device):
         super(ActorCritic, self).__init__()
 
+        self.device = device
         self.has_continuous_action_space = has_continuous_action_space
 
         if has_continuous_action_space:
             self.action_dim = action_dim
             self.action_var = torch.full(
                 (action_dim,),
-                action_std_init * action_std_init).to(device)
+                action_std_init * action_std_init).to(self.device)
 
         # actor
         if has_continuous_action_space:
@@ -89,7 +94,7 @@ class ActorCritic(nn.Module):
         if self.has_continuous_action_space:
             self.action_var = torch.full(
                 (self.action_dim,),
-                new_action_std * new_action_std).to(device)
+                new_action_std * new_action_std).to(self.device)
         else:
             print("--------------------------------------------------")
             print("WARNING : Calling ActorCritic::set_action_std() on "
@@ -122,7 +127,7 @@ class ActorCritic(nn.Module):
         if self.has_continuous_action_space:
             action_mean = self.actor(state)
             action_var = self.action_var.expand_as(action_mean)
-            cov_mat = torch.diag_embed(action_var).to(device)
+            cov_mat = torch.diag_embed(action_var).to(self.device)
             dist = MultivariateNormal(action_mean, cov_mat)
 
             # for single action continuous environments
@@ -143,8 +148,10 @@ class ActorCritic(nn.Module):
 class PPO:
     def __init__(self, state_dim, action_dim, lr_actor, lr_critic,
                  gamma, K_epochs, eps_clip,
-                 has_continuous_action_space, action_std_init=0.6):
+                 has_continuous_action_space, device,
+                 action_std_init=0.6):
 
+        self.device = device
         self.has_continuous_action_space = has_continuous_action_space
 
         if has_continuous_action_space:
@@ -158,7 +165,8 @@ class PPO:
 
         self.policy = ActorCritic(state_dim, action_dim,
                                   has_continuous_action_space,
-                                  action_std_init).to(device)
+                                  action_std_init,
+                                  self.device).to(self.device)
         self.optimizer = torch.optim.Adam([
                         {'params': self.policy.actor.parameters(),
                             'lr': lr_actor},
@@ -168,7 +176,8 @@ class PPO:
 
         self.policy_old = ActorCritic(state_dim, action_dim,
                                       has_continuous_action_space,
-                                      action_std_init).to(device)
+                                      action_std_init,
+                                      self.device).to(self.device)
         self.policy_old.load_state_dict(self.policy.state_dict())
 
         self.MseLoss = nn.MSELoss()
@@ -211,7 +220,7 @@ class PPO:
 
         if self.has_continuous_action_space:
             with torch.no_grad():
-                state = torch.FloatTensor(state).to(device)
+                state = torch.FloatTensor(state).to(self.device)
                 action, action_logprob, state_val = \
                     self.policy_old.act(state)
 
@@ -226,7 +235,7 @@ class PPO:
             with torch.no_grad():
                 if not isinstance(state, np.ndarray):
                     state = state[0]
-                state = torch.FloatTensor(state).to(device)
+                state = torch.FloatTensor(state).to(self.device)
                 action, action_logprob, state_val = \
                     self.policy_old.act(state)
 
@@ -252,21 +261,21 @@ class PPO:
             rewards.insert(0, discounted_reward)
 
         # Normalizing the rewards
-        rewards = torch.tensor(rewards, dtype=torch.float32).to(device)
+        rewards = torch.tensor(rewards, dtype=torch.float32).to(self.device)
         rewards = (rewards - rewards.mean()) / (rewards.std() + 1e-7)
 
         # convert list to tensor
         old_states = torch.squeeze(
-            torch.stack(self.buffer.states, dim=0)).detach().to(device)
+            torch.stack(self.buffer.states, dim=0)).detach().to(self.device)
         old_actions = torch.squeeze(
             torch.stack(self.buffer.actions,
-                        dim=0)).detach().to(device)
+                        dim=0)).detach().to(self.device)
         old_logprobs = torch.squeeze(
             torch.stack(self.buffer.logprobs,
-                        dim=0)).detach().to(device)
+                        dim=0)).detach().to(self.device)
         old_state_values = torch.squeeze(
             torch.stack(self.buffer.state_values,
-                        dim=0)).detach().to(device)
+                        dim=0)).detach().to(self.device)
 
         # calculate advantages
         advantages = rewards.detach() - old_state_values.detach()
@@ -317,6 +326,128 @@ class PPO:
                        loc: storage))
 
 
+def step_function(parent_parameters, hyperparameters, contributors=[]):
+    ppo_agent = parent_parameters
+    env = hyperparameters["env"]
+    max_ep_len = hyperparameters["max_ep_len"]
+    time_step = hyperparameters["time_step"]
+    update_timestep = hyperparameters["update_timestep"]
+    log_freq = hyperparameters["log_freq"]
+    log_running_reward = hyperparameters["log_running_reward"]
+    log_running_episodes = hyperparameters["log_running_episodes"]
+    i_episode = hyperparameters["i_episode"]
+    print_running_reward = hyperparameters["print_running_reward"]
+    print_running_episodes = hyperparameters["print_running_episodes"]
+    save_model_freq = hyperparameters["save_model_freq"]
+    checkpoint_path = hyperparameters["checkpoint_path"]
+    start_time = hyperparameters["start_time"]
+    log = hyperparameters["log"]
+    seed = hyperparameters["seed"]
+    print_freq = hyperparameters["print_freq"]
+
+    state = env.reset(seed=seed)
+    current_ep_reward = 0
+
+    torch.manual_seed(seed)
+    np.random.seed(seed)
+
+    for t in range(1, max_ep_len+1):
+
+        # select action with policy
+        action = ppo_agent.select_action(state)
+        state, reward, done, _, _ = env.step(action)
+
+        # saving reward and is_terminals
+        ppo_agent.buffer.rewards.append(reward)
+        ppo_agent.buffer.is_terminals.append(done)
+
+        time_step += 1
+        current_ep_reward += reward
+
+        # update PPO agent
+        if time_step % update_timestep == 0:
+            ppo_agent.update()
+
+        # if continuous action space; then decay action std of ouput
+        # action distribution
+        """if has_continuous_action_space and \
+            time_step % action_std_decay_freq == 0:
+            ppo_agent.decay_action_std(action_std_decay_rate,
+                                        min_action_std)"""
+
+        # log in logging file
+        if time_step % log_freq == 0 and log:
+            log_f = hyperparameters["log_f"]
+
+            # log average reward till last episode
+            log_avg_reward = log_running_reward / log_running_episodes
+            log_avg_reward = round(log_avg_reward, 4)
+
+            log_f.write('{},{},{}\n'.format(i_episode, time_step,
+                                            log_avg_reward))
+            log_f.flush()
+
+            log_running_reward = 0
+            log_running_episodes = 0
+
+        # printing average reward
+        if time_step % print_freq == 0:
+
+            # print average reward till last episode
+            print_avg_reward = print_running_reward /\
+                print_running_episodes
+            print_avg_reward = round(print_avg_reward, 2)
+
+            print("Episode : {} \t\t Timestep : {} \t\t Average Reward"
+                  " : {}".format(i_episode, time_step,
+                                 print_avg_reward))
+
+            print_running_reward = 0
+            print_running_episodes = 0
+
+        # save model weights
+        if time_step % save_model_freq == 0 and log:
+            print("--------------------------------------------------")
+            print("saving model at : " + checkpoint_path)
+            ppo_agent.save(checkpoint_path)
+            print("model saved")
+            print("Elapsed Time  : ",
+                  datetime.now().replace(microsecond=0) - start_time)
+            print("--------------------------------------------------")
+
+        # break; if the episode is over
+        if done:
+            break
+
+    print_running_reward += current_ep_reward
+    print_running_episodes += 1
+
+    log_running_reward += current_ep_reward
+    log_running_episodes += 1
+
+    i_episode += 1
+
+    hyperparameters = \
+        {"env": env,
+            "max_ep_len": max_ep_len,
+            "time_step": time_step,
+            "update_timestep": update_timestep,
+            "log_freq": log_freq,
+            "log_running_reward": log_running_reward,
+            "log_running_episodes": log_running_episodes,
+            "i_episode": i_episode,
+            "print_running_reward": print_running_reward,
+            "print_running_episodes": print_running_episodes,
+            "save_model_freq": save_model_freq,
+            "checkpoint_path": checkpoint_path,
+            "start_time": start_time,
+            "log": log,
+            "seed": seed,
+            "print_freq": print_freq}
+
+    return ppo_agent, hyperparameters
+
+
 class TestPhylogenetic(unittest.TestCase):
     def test_PPO(self):
         # This is a test of phylogenetic tree for PPO in the Gymnasium
@@ -327,19 +458,7 @@ class TestPhylogenetic(unittest.TestCase):
         # import roboschool
         # import pybullet_envs
 
-        # ################################# set device ########################
-
-        print("==============================================================")
-
-        # set device to cpu or cuda
-        device = torch.device('cpu')
-
-        if (torch.cuda.is_available()):
-            device = torch.device('cuda:0')
-            torch.cuda.empty_cache()
-            print("Device set to : " + str(torch.cuda.get_device_name(device)))
-        else:
-            print("Device set to : cpu")
+        device = set_device()
 
         # ################################## Training #########################
 
@@ -463,13 +582,7 @@ class TestPhylogenetic(unittest.TestCase):
 
         print("--------------------------------------------------------------")
 
-        if has_continuous_action_space:
-            print("Initializing a continuous action space policy")
-            print("----------------------------------------------------------")
-            print("starting std of action distribution : ", action_std)
-
-        else:
-            print("Initializing a discrete action space policy")
+        print("Initializing a discrete action space policy")
 
         print("--------------------------------------------------------------")
 
@@ -483,13 +596,6 @@ class TestPhylogenetic(unittest.TestCase):
         print("optimizer learning rate actor : ", lr_actor)
         print("optimizer learning rate critic : ", lr_critic)
 
-        if random_seed:
-            print("----------------------------------------------------------")
-            print("setting random seed to ", random_seed)
-            torch.manual_seed(random_seed)
-            env.seed(random_seed)
-            np.random.seed(random_seed)
-
         #####################################################
 
         print("==============================================================")
@@ -499,7 +605,7 @@ class TestPhylogenetic(unittest.TestCase):
         # initialize a PPO agent
         ppo_agent = PPO(state_dim, action_dim, lr_actor, lr_critic, gamma,
                         K_epochs, eps_clip, has_continuous_action_space,
-                        action_std)
+                        device, action_std)
 
         # track total training time
         start_time = datetime.now().replace(microsecond=0)
@@ -535,125 +641,8 @@ class TestPhylogenetic(unittest.TestCase):
                            "checkpoint_path": checkpoint_path,
                            "start_time": start_time,
                            "log": True,
-                           "seed": random_seed}
-
-        def step_function(parent_parameters, hyperparameters, contributors=[]):
-            ppo_agent = parent_parameters
-            env = hyperparameters["env"]
-            max_ep_len = hyperparameters["max_ep_len"]
-            time_step = hyperparameters["time_step"]
-            update_timestep = hyperparameters["update_timestep"]
-            log_freq = hyperparameters["log_freq"]
-            log_running_reward = hyperparameters["log_running_reward"]
-            log_running_episodes = hyperparameters["log_running_episodes"]
-            i_episode = hyperparameters["i_episode"]
-            print_running_reward = hyperparameters["print_running_reward"]
-            print_running_episodes = hyperparameters["print_running_episodes"]
-            save_model_freq = hyperparameters["save_model_freq"]
-            checkpoint_path = hyperparameters["checkpoint_path"]
-            start_time = hyperparameters["start_time"]
-            log = hyperparameters["log"]
-            seed = hyperparameters["seed"]
-
-            state = env.reset(seed=seed)
-            current_ep_reward = 0
-
-            torch.manual_seed(seed)
-            np.random.seed(seed)
-
-            for t in range(1, max_ep_len+1):
-
-                # select action with policy
-                action = ppo_agent.select_action(state)
-                state, reward, done, _, _ = env.step(action)
-
-                # saving reward and is_terminals
-                ppo_agent.buffer.rewards.append(reward)
-                ppo_agent.buffer.is_terminals.append(done)
-
-                time_step += 1
-                current_ep_reward += reward
-
-                # update PPO agent
-                if time_step % update_timestep == 0:
-                    ppo_agent.update()
-
-                # if continuous action space; then decay action std of ouput
-                # action distribution
-                """if has_continuous_action_space and \
-                   time_step % action_std_decay_freq == 0:
-                    ppo_agent.decay_action_std(action_std_decay_rate,
-                                               min_action_std)"""
-
-                # log in logging file
-                if time_step % log_freq == 0 and log:
-
-                    # log average reward till last episode
-                    log_avg_reward = log_running_reward / log_running_episodes
-                    log_avg_reward = round(log_avg_reward, 4)
-
-                    log_f.write('{},{},{}\n'.format(i_episode, time_step,
-                                                    log_avg_reward))
-                    log_f.flush()
-
-                    log_running_reward = 0
-                    log_running_episodes = 0
-
-                # printing average reward
-                if time_step % print_freq == 0:
-
-                    # print average reward till last episode
-                    print_avg_reward = print_running_reward /\
-                        print_running_episodes
-                    print_avg_reward = round(print_avg_reward, 2)
-
-                    print("Episode : {} \t\t Timestep : {} \t\t Average Reward"
-                          " : {}".format(i_episode, time_step,
-                                         print_avg_reward))
-
-                    print_running_reward = 0
-                    print_running_episodes = 0
-
-                # save model weights
-                if time_step % save_model_freq == 0 and log:
-                    print("--------------------------------------------------")
-                    print("saving model at : " + checkpoint_path)
-                    ppo_agent.save(checkpoint_path)
-                    print("model saved")
-                    print("Elapsed Time  : ",
-                          datetime.now().replace(microsecond=0) - start_time)
-                    print("--------------------------------------------------")
-
-                # break; if the episode is over
-                if done:
-                    break
-
-            print_running_reward += current_ep_reward
-            print_running_episodes += 1
-
-            log_running_reward += current_ep_reward
-            log_running_episodes += 1
-
-            i_episode += 1
-
-            hyperparameters = \
-                {"env": env,
-                 "max_ep_len": max_ep_len,
-                 "time_step": time_step,
-                 "update_timestep": update_timestep,
-                 "log_freq": log_freq,
-                 "log_running_reward": log_running_reward,
-                 "log_running_episodes": log_running_episodes,
-                 "i_episode": i_episode,
-                 "print_running_reward": print_running_reward,
-                 "print_running_episodes": print_running_episodes,
-                 "save_model_freq": save_model_freq,
-                 "checkpoint_path": checkpoint_path,
-                 "start_time": start_time,
-                 "log": log,
-                 "seed": seed}
-
-            return ppo_agent, hyperparameters
+                           "seed": random_seed,
+                           "print_freq": print_freq}
 
         # ---------- Construct phylogenetic tree ----------- #
 
@@ -662,7 +651,8 @@ class TestPhylogenetic(unittest.TestCase):
                                "log_running_reward", "log_running_episodes",
                                "i_episode", "print_running_reward",
                                "print_running_episodes", "save_model_freq",
-                               "checkpoint_path", "start_time", "log", "seed"]
+                               "checkpoint_path", "start_time", "log", "seed",
+                               "print_freq"]
 
         tree = PhylogeneticTree(hyperparameter_list, step_function,
                                 tree_sparsity=100)
@@ -676,9 +666,21 @@ class TestPhylogenetic(unittest.TestCase):
         while time_step <= max_training_timesteps:
             seed = np.random.randint(2**32 - 1)
             hyperparameters["seed"] = seed
+
+            # Important: IO files cannot be saved as hyperparameters, so if
+            # they are passed to the step function in the hyperparameter
+            # dictionary (which is, as far as I can tell, the best way to not
+            # open and close them constantly, apart from global variables) for
+            # logging purposes, they should NOT appear in the
+            # hyperparameter_list, and be removed from the hyperparameters
+            # before creating the child. This is a bit of a hack, but I don't
+            # see any obvious fix right now.
+
+            hyperparameters["log_f"] = log_f
             ppo_agent, new_hyperparameters = step_function(ppo_agent,
                                                            hyperparameters)
             time_step = new_hyperparameters["time_step"]
+            hyperparameters.pop("log_f")
             node = node.add_child(ppo_agent,
                                   hyperparameters=hyperparameters)
             node.hyperparameters["log"] = False
