@@ -39,7 +39,7 @@ class TestPhylogenetic(unittest.TestCase):
             node.add_child(model_parameters=new_DNA,
                            hyperparameters=hyperparameters)
 
-        tree.draw()
+        # tree.draw()
 
     def test_reconstruction_from_hyperparam(self):
         # Tests that any iteration of the models can be recovered even if it
