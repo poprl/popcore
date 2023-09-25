@@ -63,7 +63,7 @@ class Population:
     def __init__(
         self,
         id: str,
-        parent: 'Population' | None = None
+        parent: 'Population' = None
     ) -> None:
         self._id = id
         self._players: dict[str, Player] = dict()
@@ -80,7 +80,7 @@ class Population:
     ):
         pass
 
-    def at(self, generation: int | None = None):
+    def at(self, generation: int = None):
         pass
 
     def commit(self, *args):
