@@ -11,7 +11,7 @@ class TestPhylogenetic(unittest.TestCase):
         new_DNA = ''.join(new_DNA)
         return new_DNA, hyperparameters
 
-    def test_construction(self):
+    def test_visual_construction(self):
         # Visual test, uncomment the last line to see what the resulting trees
         # look like and check that they make sense.
 

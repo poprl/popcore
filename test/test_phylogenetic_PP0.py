@@ -12,6 +12,11 @@ import numpy as np
 
 import gym
 
+# This is an example of phylogenetic tree usage in the simple case of a single
+# agent using PPO in the Gymnasium cartpole env.
+# PPO code from https://github.com/nikhilbarhate99/PPO-PyTorch
+# (Look at the link for citation details)
+
 
 def set_device():
     device = torch.device('cpu')
@@ -450,14 +455,6 @@ def step_function(parent_parameters, hyperparameters, contributors=[]):
 
 class TestPhylogenetic(unittest.TestCase):
     def test_PPO(self):
-        # This is a test of phylogenetic tree for PPO in the Gymnasium
-        # cartpole env.
-        # PPO code from https://github.com/nikhilbarhate99/PPO-PyTorch
-        # ############################## Import libraries #####################
-
-        # import roboschool
-        # import pybullet_envs
-
         device = set_device()
 
         # ################################## Training #########################

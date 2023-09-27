@@ -4,8 +4,8 @@ import random
 from copy import deepcopy
 
 # Display libraries
-import networkx as nx               # type: ignore
-import matplotlib.pyplot as plt     # type: ignore
+import networkx as nx                                   # type: ignore
+import matplotlib.pyplot as plt                         # type: ignore
 from networkx.drawing.nx_pydot import graphviz_layout   # type: ignore
 
 
@@ -27,12 +27,6 @@ class PhylogeneticTree:
                      generation: int = 1,
                      timestep: int = 1,
                      force_save: bool = False):
-
-            self.tree = tree    # The phylogenetic tree this node belongs to
-            self.parent = parent
-            self.children: List[PhylogeneticTree.Node] = []
-            self.model_parameters = model_parameters
-            self.force_save = force_save
 
             """A node in the phylogenetic tree. This corresponds to a specific
             iteration of an individual.
@@ -77,6 +71,12 @@ class PhylogeneticTree:
                 ValueError: If the ID conflicts with an other node in the tree.
             """
 
+            self.tree = tree
+            self.parent = parent
+            self.children: List[PhylogeneticTree.Node] = []
+            self.model_parameters = model_parameters
+            self.force_save = force_save
+
             # All the other models this transition depended on
             # (opponents/allies for RL, other parent in genetics...)
             self.contributors = contributors
@@ -102,6 +102,7 @@ class PhylogeneticTree:
             tree.generations[generation - 1].append(self)
 
         def set_ID(self, ID: str) -> None:
+
             """Sets the ID to the specified value.
             If the specified value is the empty string, one is generated
             randomly.
@@ -112,6 +113,7 @@ class PhylogeneticTree:
             Raises:
                 ValueError: If the ID conflicts with an other node in the tree.
             """
+
             if ID in self.tree.nodes.keys():
                 raise ValueError("A node with this ID already exists. "
                                  "Every node must have unique ID")
@@ -125,8 +127,10 @@ class PhylogeneticTree:
                         for i in range(32))
 
         def set_tree(self, tree: 'PhylogeneticTree') -> None:
+
             """Changes the self.tree variable of this node and of it's
             offsprings to the new tree"""
+
             self.tree = tree
             if self.ID in self.tree.nodes.keys():
                 self.set_ID('')
@@ -135,12 +139,12 @@ class PhylogeneticTree:
                 c.set_tree(tree)
 
         def add_child(self, model_parameters=None,
-                      node: 'PhylogeneticTree.Node | None' = None,
                       ID: str = '',
                       hyperparameters: Dict[str, Any] = {},
                       contributors: 'List[PhylogeneticTree.Node]' = [],
                       force_save: bool = False
                       ) -> 'PhylogeneticTree.Node':
+
             """Adds a child to this node
 
             If `node` is directly specified then it will be added as a child.
@@ -157,9 +161,6 @@ class PhylogeneticTree:
                     what. Otherwise they will be discarded if deemed
                     unnecessary given the tree sparsity settings.
                     Defaults to None.
-                node (PhylogeneticTree.Node | None): If specified, this is the
-                    node that will be added as a child. Otherwise a new node
-                    will be created. Defaults to None.
                 ID (str): The ID of the child. If this is the empty string, a
                     unique ID will be picked at random.
                     Defaults to the empty string.
@@ -189,23 +190,18 @@ class PhylogeneticTree:
                 ValueError: If the ID conflicts with an other node in the tree.
             """
 
-            if node is None:
-                child = PhylogeneticTree.Node(
-                    self.tree, self,
-                    ID=ID,
-                    hyperparameters=deepcopy(hyperparameters),
-                    contributors=contributors,
-                    generation=self.generation+1)
-            else:
-                child = node
-                child.parent = self
-                child.hyperparameters = deepcopy(hyperparameters)
-                child.set_tree(self.tree)
-                child.set_ID(ID)
-                child.generation = self.generation + 1
-                if len(self.tree.generations) < child.generation:
-                    self.tree.generations.append([])
-                self.tree.generations[child.generation - 1].append(self)
+            # Create child node
+            child = PhylogeneticTree.Node(
+                self.tree, self,
+                ID=ID,
+                hyperparameters=deepcopy(hyperparameters),
+                contributors=contributors,
+                generation=self.generation+1)
+
+            child.generation = self.generation + 1
+            if len(self.tree.generations) < child.generation:
+                self.tree.generations.append([])
+            self.tree.generations[child.generation - 1].append(child)
 
             if child.get_nbr_unsaved_ancestors() > self.tree.tree_sparsity:
                 child.model_parameters = deepcopy(model_parameters)
@@ -217,6 +213,7 @@ class PhylogeneticTree:
 
         def get_model_parameters(self, save: bool = False,
                                  recursive: bool = False) -> Any:
+
             """Returns the parameters of the model corresponding with this
             node.
 
@@ -266,6 +263,7 @@ class PhylogeneticTree:
             recomputed in order to get the parameters of this model.
 
             Note that contributors count as ancestors"""
+
             if self.model_parameters is not None:
                 return 0
 
@@ -302,17 +300,18 @@ class PhylogeneticTree:
             step_function (Callable[[Any,
                                      Dict[str, Any],
                                      List[PhylogeneticTree.Node]],
-                                    Any]):
+                                    [Any, Dict[str, Any]]]):
                 step_function(model_parameters, hyperparameters, contributors)
                 is the step function during the training of models. It is a
                 function that when given model parameters, a hyperparameters
                 dictionary containing all necessary values and a list of
                 contributor's parameters (opponents, allies, mates...)
                 can deterministically return the parameters of the resulting
-                model.
+                model, and the updated hyperparameters.
                 This means that if you give the initial model, the
                 hyperparameters and the opponent(s) it faced to this function,
-                it will return the updated model.
+                it will return the updated model and the updated
+                hyperparameters.
                 If a stochastic process happens during transition from one
                 model to the next, it must be seeded at each step for
                 reproducability, and that seed saved as a hyperparameter.
@@ -338,6 +337,7 @@ class PhylogeneticTree:
 
     def add_root(self, model_parameters: Any, ID: str = ''
                  ) -> 'PhylogeneticTree.Node':
+
         """Add a root to the forest (A root is a node without ancestors).
 
         Args:
@@ -362,9 +362,11 @@ class PhylogeneticTree:
         return root
 
     def draw(self) -> None:
+
         """Displays the phylogenetic tree.
 
         Only parental edges are shown, contributors are ignored."""
+
         G = nx.Graph()
         G.add_nodes_from(self.nodes.keys())
 
