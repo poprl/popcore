@@ -247,7 +247,7 @@ class Population:
         # An array of every node indexed by generation (1st gen has index 0)
         self.generations: List[List[Player]] = [[]]
 
-        # A list of all branches 
+        # A list of all branches
         self.branches: Dict[str, Player] = {"_root": self._root}
 
         self.current_node = self._root
