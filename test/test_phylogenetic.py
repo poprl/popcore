@@ -1,6 +1,36 @@
 import unittest
-from popcore.phylogenetic import PhylogeneticTree
+from popcore.phylogenetic import Population
 import random
+
+# Display libraries
+import networkx as nx                                   # type: ignore
+import matplotlib.pyplot as plt                         # type: ignore
+from networkx.drawing.nx_pydot import graphviz_layout   # type: ignore
+
+
+def draw(population: Population) -> None:  # TODO: Move that
+
+    """Displays the phylogenetic tree.
+
+    Only parental edges are shown, contributors are ignored."""
+
+    G = nx.Graph()
+    G.add_nodes_from(population.nodes.keys())
+
+    queue = [population._root]
+
+    while len(queue):
+        node = queue[0]
+        queue = queue[1:]
+
+        for c in node.children:
+            G.add_edge(node.id_str, c.id_str)
+            queue.append(c)
+
+    pos = graphviz_layout(G, prog="dot")
+    nx.draw_networkx(G, pos, labels={x.id_str: x.model_parameters
+                                     for x in population.nodes.values()})
+    plt.show()
 
 
 class TestPhylogenetic(unittest.TestCase):
@@ -18,67 +48,106 @@ class TestPhylogenetic(unittest.TestCase):
         # Suppose this is a tree tracking the evolution of a
         # strand of DNA
 
-        tree = PhylogeneticTree(hyperparameter_names=["letter", "spot"],
-                                step_function=TestPhylogenetic.mutate,
-                                tree_sparsity=3)
+        pop = Population(sparsity=0)
         # tree.add_root("GGTCAACAAATCATAAAGATATTGG")  # Land snail DNA
         new_DNA = "OOOOO"
-        tree.add_root(new_DNA)
-        tree.add_root(new_DNA)
-        tree.add_root(new_DNA)
+        pop.branch("Lineage 1")
+        pop.branch("Lineage 2")
+        pop.branch("Lineage 3")
 
-        for _ in range(64):
-            node = tree.nodes[random.choice(list(tree.nodes.keys()))]
+        pop.checkout("Lineage 1")
+        pop.commit(model_parameters=new_DNA)
+
+        pop.checkout("Lineage 2")
+        pop.commit(model_parameters=new_DNA)
+
+        pop.checkout("Lineage 3")
+        pop.commit(model_parameters=new_DNA)
+
+        for _ in range(32):
+            branch = random.choice(list(pop.branches.keys()))
+
+            if branch == "_root":
+                continue
+
             letter = random.choice("ACGT")
             spot = random.randrange(len(new_DNA))
 
+            pop.checkout(branch)
+
             hyperparameters = {"letter": letter, "spot": spot}
-            new_DNA, _ = TestPhylogenetic.mutate(node.get_model_parameters(),
+            new_DNA, _ = TestPhylogenetic.mutate(pop.get_model_parameters(),
                                                  hyperparameters)
 
-            node.add_child(model_parameters=new_DNA,
-                           hyperparameters=hyperparameters)
+            pop.commit(model_parameters=new_DNA,
+                       hyperparameters=hyperparameters)
 
-        # tree.draw()
+        # draw(pop)
 
-    def test_reconstruction_from_hyperparam(self):
-        # Tests that any iteration of the models can be recovered even if it
-        # was not saved
-        tree = PhylogeneticTree(hyperparameter_names=["letter", "spot"],
-                                step_function=TestPhylogenetic.mutate,
-                                tree_sparsity=3)
+    def test_linear(self):
+        pop = Population(sparsity=0)
+
         new_DNA = "OOOOO"
-        node = tree.add_root(new_DNA)
+        DNA_history = [new_DNA]
 
-        DNA_iterations = [new_DNA]
+        pop.commit(model_parameters=new_DNA)
 
-        # Generate the tree but don't keep the DNA strands
-        for _ in range(64):
+        for x in range(16):
             letter = random.choice("ACGT")
             spot = random.randrange(len(new_DNA))
 
             hyperparameters = {"letter": letter, "spot": spot}
-            new_DNA, _ = TestPhylogenetic.mutate(new_DNA, hyperparameters)
-            DNA_iterations.append(new_DNA)
+            new_DNA, _ = TestPhylogenetic.mutate(new_DNA,
+                                                 hyperparameters)
+            DNA_history.append(new_DNA)
 
-            node.add_child(hyperparameters=hyperparameters)
+            pop.commit(model_parameters=new_DNA,
+                       hyperparameters=hyperparameters)
+
+        # draw(pop)
+
+        nbr_nodes = 1
+        node = pop._root
+        while len(node.children):
+            nbr_nodes += 1
+            assert len(node.children) == 1
             node = node.children[0]
+            assert node.model_parameters == DNA_history[nbr_nodes-2]
 
-        # Retrieve the DNA strands from the hyperparameters
-        retrieved_DNA = []
-        node = tree.roots[0]
-        retrieved_DNA.append(node.get_model_parameters(save=False))
+        assert nbr_nodes == 18
 
-        while len(node.children) > 0:
-            node = node.children[0]
-            retrieved_DNA.append(node.get_model_parameters(save=False))
+    def test_sparsity(self):
+        pop = Population(sparsity=3)
 
-        self.assertListEqual(DNA_iterations, retrieved_DNA)
-
-    def test_undefined_step_function(self):
-        tree = PhylogeneticTree(hyperparameter_names=["letter", "spot"])
         new_DNA = "OOOOO"
-        node = tree.add_root(new_DNA)
-        node.add_child(hyperparameters={"spot": 0, "letter": "A"})
+        DNA_history = [new_DNA]
 
-        self.assertRaises(ValueError, node.children[0].get_model_parameters)
+        pop.commit(model_parameters=new_DNA)
+
+        for x in range(16):
+            letter = random.choice("ACGT")
+            spot = random.randrange(len(new_DNA))
+
+            hyperparameters = {"letter": letter, "spot": spot}
+            new_DNA, _ = TestPhylogenetic.mutate(new_DNA,
+                                                 hyperparameters)
+            DNA_history.append(new_DNA)
+
+            pop.commit(model_parameters=new_DNA,
+                       hyperparameters=hyperparameters)
+
+        # draw(pop)
+
+        nbr_nodes = 1
+        node = pop._root
+        while len(node.children):
+            nbr_nodes += 1
+            self.assertEqual(len(node.children), 1)
+            node = node.children[0]
+            if (nbr_nodes - 2) % 4 == 0:
+                self.assertEqual(node.model_parameters,
+                                 DNA_history[nbr_nodes-2])
+            else:
+                self.assertIsNone(node.model_parameters)
+
+        assert nbr_nodes == 18
