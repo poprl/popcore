@@ -157,7 +157,9 @@ class Player:
 
         return 1 + sum([x.get_nbr_unsaved_ancestors() for x in ancestors])
 
-    def rebuild_model_parameters(self, save: bool = False,
+    def rebuild_model_parameters(self,
+                                 step_function=lambda x: None,
+                                 save: bool = False,
                                  recursive: bool = False) -> Any:
 
         """Deprecated, do not use, kept for later re-implementation.
@@ -201,7 +203,7 @@ class Player:
             parent_param = self.parent.rebuild_model_parameters(
                 save if recursive else False, recursive)
 
-        model_parameters, _ = self.tree.step_function(
+        model_parameters, _ = step_function(
             parent_param,
             self.hyperparameters,
             contributors_param)
@@ -344,8 +346,6 @@ class Population:
 
         id_str = self.__generate_id(id_str)
         new_node = self.current_node.add_child(
-            model_parameters=self.current_node.model_parameters,
-            hyperparameters=self.current_node.hyperparameters,
             new_generation=False,
             id_str=id_str)
 

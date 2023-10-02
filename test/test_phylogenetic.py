@@ -82,7 +82,7 @@ class TestPhylogenetic(unittest.TestCase):
             pop.commit(model_parameters=new_DNA,
                        hyperparameters=hyperparameters)
 
-        # draw(pop)
+        draw(pop)
 
     def test_linear(self):
         pop = Population(sparsity=0)
@@ -104,7 +104,7 @@ class TestPhylogenetic(unittest.TestCase):
             pop.commit(model_parameters=new_DNA,
                        hyperparameters=hyperparameters)
 
-        # draw(pop)
+        draw(pop)
 
         nbr_nodes = 1
         node = pop._root
@@ -116,7 +116,7 @@ class TestPhylogenetic(unittest.TestCase):
 
         assert nbr_nodes == 18
 
-    def test_sparsity(self):
+    def test_linear_sparsity(self):
         pop = Population(sparsity=3)
 
         new_DNA = "OOOOO"
@@ -136,7 +136,7 @@ class TestPhylogenetic(unittest.TestCase):
             pop.commit(model_parameters=new_DNA,
                        hyperparameters=hyperparameters)
 
-        # draw(pop)
+        draw(pop)
 
         nbr_nodes = 1
         node = pop._root
@@ -151,3 +151,62 @@ class TestPhylogenetic(unittest.TestCase):
                 self.assertIsNone(node.model_parameters)
 
         assert nbr_nodes == 18
+
+    def test_complex(self):
+        pop = Population(sparsity=0)
+        pop.branch("b1")
+        pop.checkout("b1")
+        pop.commit("1")
+        pop.branch("b2")
+        pop.checkout("b2")
+        pop.commit("2")
+        pop.commit("3")
+        pop.checkout("_root")
+        pop.branch("b3")
+        pop.checkout("b3")
+        pop.commit("4")
+        pop.checkout("b1")
+        pop.commit("5")
+
+        draw(pop)
+
+        pop.checkout('b2')
+        self.assertSetEqual(set(pop.get_branches()),
+                            set(["_root", "b1", "b2", "b3"]))
+        self.assertEqual(len(pop.get_branches()), len(set(pop.get_branches())))
+
+        self.assertEqual(pop.get_current_branch(), "b2")
+
+        self.assertEqual(len(pop.get_commit_history()), 6)
+
+    def test_complex_sparsity(self):
+        pop = Population(sparsity=2)
+        pop.branch("b1")
+        pop.checkout("b1")
+        pop.commit("1")
+        pop.branch("b2")
+        pop.checkout("b2")
+        pop.commit("2")
+        pop.commit("3")
+        pop.checkout("_root")
+        pop.branch("b3")
+        pop.checkout("b3")
+        pop.commit("4")
+        pop.checkout("b1")
+        pop.commit("5")
+
+        draw(pop)
+
+        pop.checkout('b2')
+        self.assertSetEqual(set(pop.get_branches()),
+                            set(["_root", "b1", "b2", "b3"]))
+        self.assertEqual(len(pop.get_branches()), len(set(pop.get_branches())))
+
+        self.assertEqual(pop.get_current_branch(), "b2")
+
+        self.assertEqual(len(pop.get_commit_history()), 6)
+
+        saved_params = [x.model_parameters for x in pop.nodes.values()
+                        if x.model_parameters is not None]
+
+        self.assertSetEqual(set(saved_params), set(["1", "4", "3"]))
