@@ -20,19 +20,19 @@ class Player:
         This is equivalent to a commit in the population.
 
         Args:
-            parent (Player | None): The parent of this node.
-                If None, this is considered a root. Every node may only
+            parent (Player | None): The parent of this player.
+                If None, this is considered a root. Every player may only
                 have one parent, but if it needs more, it can have
                 arbitrarily many contributors. Defaults to None
             model_parameters (Any): The parameters of the model. With
                 neural networks, that would be the weights and biases.
                 Defaults to None.
-            id_str (str): The id_str of the node to find it in the population.
+            id_str (str): The id_str of the player to find it in the pop.
                 id_strs must be unique within each pop. Defaults to the empty
                 string.
             hyperparameters (Dict[str, Any]): A dictionary of the
                 hyperparameters that define the transition from the parent
-                to this node. This should contain enough information to
+                to this player. This should contain enough information to
                 reproduce the evolution step deterministically given the
                 parent and contributors parameters.
                 Defaults to an empty dict.
@@ -44,9 +44,9 @@ class Player:
                 an opponent and learned from it, the parent would be the
                 model before that game, and the contributor would be the
                 opponent. Defaults to an empty list.
-            generation (int): The generation this node belongs to.
+            generation (int): The generation this player belongs to.
                 Defaults to 1.
-            timestep (int): The timestep when this node was created.
+            timestep (int): The timestep when this player was created.
                 Defaults to 1.
 
         Raises:
@@ -76,7 +76,8 @@ class Player:
                   id_str: str = '',
                   hyperparameters: Dict[str, Any] = {},
                   contributors: 'List[Player]' = [],
-                  new_generation: bool = True) -> 'Player':
+                  new_generation: bool = True,
+                  timestep: int = 1) -> 'Player':
 
         """Adds a child to this node
 
@@ -130,7 +131,8 @@ class Player:
             model_parameters=model_parameters,
             hyperparameters=hyperparameters,
             contributors=contributors,
-            generation=self.generation+1)
+            generation=self.generation+1,
+            timestep=timestep)
 
         if new_generation:
             child.generation = self.generation + 1
@@ -284,7 +286,8 @@ class Population:
     def commit(self, model_parameters: Any = None,
                hyperparameters: Dict[str, Any] = {},
                contributors: 'List[Player]' = [],
-               id_str: str = '') -> str:
+               id_str: str = '',
+               timestep: int = 1) -> str:
         """Creates a new commit in the current branch.
 
         Args:
@@ -314,7 +317,8 @@ class Population:
         child = self.current_node.add_child(
             id_str=id_str,
             hyperparameters=hyperparameters,
-            contributors=contributors)
+            contributors=contributors,
+            timestep=timestep)
 
         if child.get_nbr_unsaved_ancestors() > self.sparsity:
             child.model_parameters = model_parameters
@@ -350,7 +354,8 @@ class Population:
         id_str = self.__generate_id(id_str)
         new_node = self.current_node.add_child(
             new_generation=False,
-            id_str=id_str)
+            id_str=id_str,
+            timestep=self.current_node.timestep)
 
         if branch_name in self.branches.keys():
             raise ValueError(f"A branch with the name '{branch_name}' already"

@@ -645,12 +645,15 @@ class TestPhylogenetic(unittest.TestCase):
 
         pop = Population(sparsity=100)
         agents_params = [str(ppo_agent.policy.actor.state_dict())]
-        hyperparams = [None]
+        hyperparams = [{}]
+        pop.commit(agents_params[0])
 
         np.random.seed(random_seed)
+        steps = 1
 
         # training loop
         while time_step <= max_training_timesteps:
+            steps += 1
             seed = np.random.randint(2**32 - 1)
             hyperparameters["seed"] = seed
 
@@ -669,6 +672,9 @@ class TestPhylogenetic(unittest.TestCase):
             time_step = new_hyperparameters["time_step"]
             hyperparameters.pop("log_f")
             param = str(ppo_agent.policy.actor.state_dict())
+
+            pop.commit(param, hyperparameters)
+
             agents_params.append(param)
             hyperparams.append(new_hyperparameters)
             pop.current_node.hyperparameters["log"] = False
@@ -693,7 +699,7 @@ class TestPhylogenetic(unittest.TestCase):
 
             self.assertEqual(len(node.children), 1)
 
-            if i % 101:
+            if i % 101 == 0:
                 self.assertEqual(
                     agents_params[i],
                     pop.nodes[node.id_str].model_parameters)
@@ -703,6 +709,8 @@ class TestPhylogenetic(unittest.TestCase):
             self.assertDictEqual(node.hyperparameters, hyperparams[i+1])
             node = node.children[0]
             i += 1
+
+        self.assertEqual(i+1, steps)
 
         """recovered = node.get_model_parameters()
 
