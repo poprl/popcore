@@ -643,7 +643,9 @@ class TestPhylogenetic(unittest.TestCase):
 
         # ---------- Construct phylogenetic tree ----------- #
 
-        pop = Population(sparsity=100)
+        pop = Population()
+        pop.branch("agent")
+        pop.checkout("agent")
         agents_params = [str(ppo_agent.policy.actor.state_dict())]
         hyperparams = [None, None]
         pop.commit(agents_params[0])
@@ -699,7 +701,7 @@ class TestPhylogenetic(unittest.TestCase):
 
             self.assertEqual(len(node.children), 1)
 
-            if i % 101 == 0:
+            if i > -1:
                 self.assertEqual(
                     agents_params[i],
                     pop.nodes[node.id_str].model_parameters)

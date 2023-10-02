@@ -1,8 +1,10 @@
 from typing import List, Dict, Any
 import string
 import random
+import warnings
 
 
+# TODO: Remove sparsity from here
 # TODO: add callback possibilities for
 #    - Id generation
 #    - Node construction
@@ -22,7 +24,8 @@ class Player:
                  hyperparameters: Dict[str, Any] | None = None,
                  contributors: 'List[Player] | None' = None,
                  generation: int = 0,
-                 timestep: int = 1):
+                 timestep: int = 1,
+                 force_save: bool = False):
 
         """A specific version of an agent at a given point in time.
 
@@ -94,9 +97,16 @@ class Player:
         Otherwise, the other parameters will be used to create a new node
         and add it as a child.
 
+        If force_save is true, the model will be kept. Otherwise it will
+        be discarded if deemed unnecessary given the tree sparsity
+        settings.
+
         Args:
             model_parameters (Any): The model parameters of the child to be
-                added. Defaults to None.
+                added. If force_save is true, they will be kept no matter
+                what. Otherwise they will be discarded if deemed
+                unnecessary given the tree sparsity settings.
+                Defaults to None.
             id_str (str): The id_str of the child. If this is the empty string,
                 a unique id_str will be picked at random.
                 Defaults to the empty string.
@@ -114,6 +124,10 @@ class Player:
                 an opponent and learned from it, the parent would be the
                 model before that game, and the contributor would be the
                 opponent. Defaults to an empty list.
+            force_save (bool): If set to False, the model parameters will
+                be discarded if judged unnecessary based on the tree
+                sparsity parameter to save space. If set to true, the
+                model parameters will be kept no matter what.
 
         Returns:
             PhylogeneticTree.Node: The new child
@@ -144,13 +158,90 @@ class Player:
     def has_child(self) -> bool:
         return len(self.children) > 0
 
+    def get_nbr_unsaved_ancestors(self) -> int:
+        """Returns the number of ancestors that would need to be
+        recomputed in order to get the parameters of this model.
+
+        Note that contributors count as ancestors"""
+
+        if self.model_parameters is not None:
+            return 0
+
+        if self.parent is None:
+            return 99999999999999999999999
+
+        ancestors = [self.parent]
+        if self.contributors is not None:
+            ancestors += self.contributors
+
+        return 1 + sum([x.get_nbr_unsaved_ancestors() for x in ancestors])
+
+    def rebuild_model_parameters(self,
+                                 step_function=lambda x: None,
+                                 save: bool = False,
+                                 recursive: bool = False) -> Any:
+
+        """Deprecated, do not use, kept for later re-implementation.
+
+        Returns the parameters of the model corresponding with this
+        node.
+
+        If self.model_parameters is not None, the parameters will be
+        returned directly. Otherwise, they will have to be recomputed
+        with the step function using the hyperparameters, parent and
+        contributors. Since the parents and contributors might also not
+        have their model parameters saved, this is a recursive function,
+        and the maximum number of calls is limited by the tree_sparseness
+        parameter defined when initializing the phylogenetic tree.
+
+        Args:
+            save (bool): If set to true, the parameters of this model will
+                be saved so that they don't have to be recomputed every
+                time. Defaults to False.
+            recursive (bool): If save and recursive are set to true, the
+                parameters of all the ancestors computed will also be
+                saved. If save is False, this does nothing.
+                Defaults to False.
+
+        Returns:
+            Any: The parameters of the model that corresponf to this node.
+        """
+
+        warnings.warn("rebuild_model_parameters is deprecated, and is only "
+                      "kept for later re-implementation. "
+                      "It should not be used",
+                      DeprecationWarning)
+
+        if self.model_parameters is not None:
+            return self.model_parameters
+
+        contributors_param = []
+        if self.contributors is not None:
+            contributors_param = [x.rebuild_model_parameters()
+                                  for x in self.contributors]
+
+        if self.parent is not None:
+            parent_param = self.parent.rebuild_model_parameters(
+                save if recursive else False, recursive)
+
+        model_parameters, _ = step_function(
+            parent_param,
+            self.hyperparameters,
+            contributors_param)
+
+        if save:
+            self.model_parameters = model_parameters
+
+        return model_parameters
+
 
 class Population:
     """A data structure to manipulate evolving populations of agents.
     The structure is meant to be similar to that of a git repository, where
     every branch corresponds to an agent."""
 
-    def __init__(self):
+    def __init__(self,
+                 sparsity: int = 100):
         """Instantiates population of agents.
 
         This is a data structure that records the evolution of populations of
@@ -161,9 +252,17 @@ class Population:
         This is initialized with a '_root' branch. Users should not commit
         directly to this branch if they want to track multiple separate agents,
         but rather create a branch for every new agent.
+
+        Args:
+            sparsity (int): How many unsaved ancestors any given agent can
+                have.  Higher sparsity means the population will be lighter in
+                memory, but getting non-saved agents will take longer (as all
+                the ancestors need to be re-computed).
+                Defaults to 100.
         """
 
         self._root = Player(id_str="_root")
+        self.sparsity: int = sparsity
 
         # A dictionary containing all commits in the tree
         # Multiple keys may refer to the same commit. In particular, branches
@@ -235,10 +334,12 @@ class Population:
         # Create the child node
         child = self.current_node.add_child(
             id_str=id_str,
-            model_parameters=model_parameters,
             hyperparameters=hyperparameters,
             contributors=contributors,
             timestep=timestep)
+
+        if child.get_nbr_unsaved_ancestors() > self.sparsity:
+            child.model_parameters = model_parameters
 
         # Update the dict of nodes
         self.nodes[id_str] = child
@@ -252,7 +353,7 @@ class Population:
 
         return id_str
 
-    def branch(self, branch_name: str) -> str:
+    def branch(self, branch_name: str, id_str: str = '') -> str:
         """Create a new branch diverging from the current branch.
 
         Args:

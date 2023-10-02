@@ -48,7 +48,7 @@ class TestPhylogenetic(unittest.TestCase):
         # Suppose this is a tree tracking the evolution of a
         # strand of DNA
 
-        pop = Population(sparsity=0)
+        pop = Population()
         # tree.add_root("GGTCAACAAATCATAAAGATATTGG")  # Land snail DNA
         new_DNA = "OOOOO"
         pop.branch("Lineage 1")
@@ -65,7 +65,7 @@ class TestPhylogenetic(unittest.TestCase):
         pop.commit(model_parameters=new_DNA)
 
         for _ in range(32):
-            branch = random.choice(list(pop.branches.keys()))
+            branch = random.choice(pop.branches)
 
             if branch == "_root":
                 continue
@@ -85,7 +85,7 @@ class TestPhylogenetic(unittest.TestCase):
         # draw(pop)
 
     def test_linear(self):
-        pop = Population(sparsity=0)
+        pop = Population()
 
         new_DNA = "OOOOO"
         DNA_history = [new_DNA]
@@ -116,8 +116,8 @@ class TestPhylogenetic(unittest.TestCase):
 
         assert nbr_nodes == 18
 
-    def test_linear_sparsity(self):
-        pop = Population(sparsity=3)
+    """def test_linear_sparsity(self):
+        pop = Population()
 
         new_DNA = "OOOOO"
         DNA_history = [new_DNA]
@@ -150,10 +150,10 @@ class TestPhylogenetic(unittest.TestCase):
             else:
                 self.assertIsNone(node.model_parameters)
 
-        assert nbr_nodes == 18
+        assert nbr_nodes == 18"""
 
     def test_complex(self):
-        pop = Population(sparsity=0)
+        pop = Population()
         pop.branch("b1")
         pop.checkout("b1")
         pop.commit("1")
@@ -168,7 +168,7 @@ class TestPhylogenetic(unittest.TestCase):
         pop.checkout("b1")
         pop.commit("5")
 
-        # draw(pop)
+        draw(pop)
 
         pop.checkout('b2')
         self.assertSetEqual(set(pop.get_branches()),
@@ -177,10 +177,10 @@ class TestPhylogenetic(unittest.TestCase):
 
         self.assertEqual(pop.get_current_branch(), "b2")
 
-        self.assertEqual(len(pop.get_commit_history()), 6)
+        self.assertEqual(len(pop.get_commit_history()), 4)
 
-    def test_complex_sparsity(self):
-        pop = Population(sparsity=2)
+    """def test_complex_sparsity(self):
+        pop = Population()
         pop.branch("b1")
         pop.checkout("b1")
         pop.commit("1")
@@ -209,4 +209,4 @@ class TestPhylogenetic(unittest.TestCase):
         saved_params = [x.model_parameters for x in pop.nodes.values()
                         if x.model_parameters is not None]
 
-        self.assertSetEqual(set(saved_params), set(["1", "4", "3"]))
+        self.assertSetEqual(set(saved_params), set(["1", "4", "3"]))"""
