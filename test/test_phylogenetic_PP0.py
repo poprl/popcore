@@ -644,8 +644,8 @@ class TestPhylogenetic(unittest.TestCase):
         # ---------- Construct phylogenetic tree ----------- #
 
         pop = Population(sparsity=100)
-        initial_param = ppo_agent.policy.actor.state_dict()
-        pop.commit(model_parameters=initial_param)
+        agents_params = [str(ppo_agent.policy.actor.state_dict())]
+        hyperparams = [None]
 
         np.random.seed(random_seed)
 
@@ -668,8 +668,9 @@ class TestPhylogenetic(unittest.TestCase):
                                                            hyperparameters)
             time_step = new_hyperparameters["time_step"]
             hyperparameters.pop("log_f")
-            param = ppo_agent.policy.actor.state_dict()
-            pop.commit(param, hyperparameters=hyperparameters)
+            param = str(ppo_agent.policy.actor.state_dict())
+            agents_params.append(param)
+            hyperparams.append(new_hyperparameters)
             pop.current_node.hyperparameters["log"] = False
             hyperparameters = new_hyperparameters
 
@@ -684,11 +685,26 @@ class TestPhylogenetic(unittest.TestCase):
         print("Total training time  : ", end_time - start_time)
         print("==============================================================")
 
-        """# Assert that the root model has not been changed
-        self.assertEqual(initial_param,
-                         str(root.model_parameters.policy.actor.state_dict()))
+        # Assert that the models were properly saved
 
-        recovered = node.get_model_parameters()
+        node = pop.nodes["_root"]
+        i = -1
+        while node.has_child():
+
+            self.assertEqual(len(node.children), 1)
+
+            if i % 101:
+                self.assertEqual(
+                    agents_params[i],
+                    pop.nodes[node.id_str].model_parameters)
+            else:
+                self.assertIsNone(node.model_parameters)
+
+            self.assertDictEqual(node.hyperparameters, hyperparams[i+1])
+            node = node.children[0]
+            i += 1
+
+        """recovered = node.get_model_parameters()
 
         # Assert that the recovered agent is the same as the original one.
         self.assertEqual(str(recovered.policy.actor.state_dict()),

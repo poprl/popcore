@@ -141,6 +141,9 @@ class Player:
 
         return child
 
+    def has_child(self) -> bool:
+        return len(self.children) > 0
+
     def get_nbr_unsaved_ancestors(self) -> int:
         """Returns the number of ancestors that would need to be
         recomputed in order to get the parameters of this model.
@@ -255,7 +258,7 @@ class Population:
         self.current_node = self._root
         self.current_branch = "_root"
 
-    def __generate_id(self, id_str: str = ''):
+    def __generate_id(self, id_str: str = '') -> str:
         """Generate random unique id_str for a new node/commit
 
         Args:
