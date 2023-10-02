@@ -152,7 +152,7 @@ class TestPhylogenetic(unittest.TestCase):
 
         assert nbr_nodes == 18"""
 
-    def test_complex(self):
+    def test_nonlinear(self):
         pop = Population()
         pop.branch("b1")
         pop.checkout("b1")
@@ -168,7 +168,7 @@ class TestPhylogenetic(unittest.TestCase):
         pop.checkout("b1")
         pop.commit("5")
 
-        draw(pop)
+        # draw(pop)
 
         pop.checkout('b2')
         self.assertSetEqual(set(pop.get_branches()),

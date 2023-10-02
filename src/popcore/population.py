@@ -1,7 +1,5 @@
 from typing import List, Dict, Any
-import string
-import random
-
+from hashlib import sha1
 
 # TODO: add callback possibilities for
 #    - Id generation
@@ -179,26 +177,28 @@ class Population:
         self.branches: List[str] = ["_root"]
 
     def __generate_id(self, id_str: str = '') -> str:
-        # TODO: Use path to node to generate sha-1
         """Generate random unique id_str for a new node/commit
 
         Args:
             id_str (str): The id_str we want the new node to have. If this is
-                the empty string, a random one will be generated. Defaults to
+                the empty string, one will be generated using sha1. Defaults to
                 the empty string.
 
         Raises:
             ValueError: If a node with the specified id_str already exists"""
 
+        if id_str == '':
+            node: Player | None = self.current_node
+            path = ''.join([str(c) for c in self.current_node.children]) + '|'
+            while node is not None:
+                path += str(node)
+                node = node.parent
+            print(path)
+            id_str = sha1(path.encode()).hexdigest()
+
         if id_str in self.nodes.keys():
             raise ValueError(f"A commit with id_str {id_str} already exists. "
                              "Every commit must have unique id_str")
-
-        if id_str == '':
-            while id_str == '' or id_str in self.nodes.keys():
-                id_str = ''.join(
-                    random.choice(string.ascii_letters + string.digits)
-                    for i in range(32))
 
         return id_str
 
