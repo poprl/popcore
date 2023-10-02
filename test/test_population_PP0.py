@@ -1,5 +1,5 @@
 import unittest
-from popcore.phylogenetic import Population
+from popcore.population import Population
 import os
 from datetime import datetime
 
@@ -645,7 +645,7 @@ class TestPhylogenetic(unittest.TestCase):
 
         pop = Population(sparsity=100)
         agents_params = [str(ppo_agent.policy.actor.state_dict())]
-        hyperparams = [{}]
+        hyperparams = [None, None]
         pop.commit(agents_params[0])
 
         np.random.seed(random_seed)
@@ -676,7 +676,7 @@ class TestPhylogenetic(unittest.TestCase):
             pop.commit(param, hyperparameters)
 
             agents_params.append(param)
-            hyperparams.append(new_hyperparameters)
+            hyperparams.append(hyperparameters)
             pop.current_node.hyperparameters["log"] = False
             hyperparameters = new_hyperparameters
 
@@ -706,7 +706,10 @@ class TestPhylogenetic(unittest.TestCase):
             else:
                 self.assertIsNone(node.model_parameters)
 
-            self.assertDictEqual(node.hyperparameters, hyperparams[i+1])
+            if node.hyperparameters is None:
+                self.assertIsNone(hyperparams[i+1])
+            else:
+                self.assertDictEqual(node.hyperparameters, hyperparams[i+1])
             node = node.children[0]
             i += 1
 

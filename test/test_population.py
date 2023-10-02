@@ -1,5 +1,5 @@
 import unittest
-from popcore.phylogenetic import Population
+from popcore.population import Population
 import random
 
 # Display libraries

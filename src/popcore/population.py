@@ -4,13 +4,25 @@ import random
 import warnings
 
 
+# TODO: Remove sparsity from here
+# TODO: add callback possibilities for
+#    - Id generation
+#    - Node construction
+#    - Persistance
+# TODO: Saving/loading whole population (not in MVP, do later)
+# TODO: pop.fork() -> Population (not in MVP, for later)
+# TODO: pop.merge(Population) -> Population (not in MVP, for later)
+# TODO: Detaching a node from the pop for multiprocessing without copying the
+# entire structure. Also attach
+
+
 class Player:
     def __init__(self,
                  parent: 'Player | None' = None,
                  model_parameters: Any = None,
                  id_str: str = '',
-                 hyperparameters: Dict[str, Any] = {},
-                 contributors: 'List[Player]' = [],
+                 hyperparameters: Dict[str, Any] | None = None,
+                 contributors: 'List[Player] | None' = None,
                  generation: int = 0,
                  timestep: int = 1,
                  force_save: bool = False):
@@ -67,15 +79,15 @@ class Player:
 
         self.id_str = id_str
         self.generation: int = generation
-        self.timestep: int = timestep   # TODO: Remove
+        self.timestep: int = timestep
 
         # Parameters to reproduce evolution from parent
-        self.hyperparameters: Dict[str, Any] = hyperparameters
+        self.hyperparameters: Dict[str, Any] | None = hyperparameters
 
     def add_child(self, model_parameters=None,
                   id_str: str = '',
-                  hyperparameters: Dict[str, Any] = {},
-                  contributors: 'List[Player]' = [],
+                  hyperparameters: Dict[str, Any] | None = None,
+                  contributors: 'List[Player] | None' = None,
                   new_generation: bool = True,
                   timestep: int = 1) -> 'Player':
 
@@ -158,7 +170,9 @@ class Player:
         if self.parent is None:
             return 99999999999999999999999
 
-        ancestors = [self.parent] + self.contributors
+        ancestors = [self.parent]
+        if self.contributors is not None:
+            ancestors += self.contributors
 
         return 1 + sum([x.get_nbr_unsaved_ancestors() for x in ancestors])
 
@@ -201,8 +215,10 @@ class Player:
         if self.model_parameters is not None:
             return self.model_parameters
 
-        contributors_param = [x.rebuild_model_parameters()
-                              for x in self.contributors]
+        contributors_param = []
+        if self.contributors is not None:
+            contributors_param = [x.rebuild_model_parameters()
+                                  for x in self.contributors]
 
         if self.parent is not None:
             parent_param = self.parent.rebuild_model_parameters(
@@ -249,7 +265,7 @@ class Population:
         self.sparsity = sparsity
 
         # A dictionary containing all nodes in the tree
-        self.nodes: Dict[str, Player] = {"_root": self._root}
+        self.nodes: Dict[str, Player] = {"_root": self._root} # TODO: merge this with branches
 
         # An array of every node indexed by generation (1st gen has index 0)
         self.generations: List[List[Player]] = [[]]
@@ -261,6 +277,7 @@ class Population:
         self.current_branch = "_root"
 
     def __generate_id(self, id_str: str = '') -> str:
+        # TODO: Use path to node to generate sha-1
         """Generate random unique id_str for a new node/commit
 
         Args:
@@ -284,8 +301,8 @@ class Population:
         return id_str
 
     def commit(self, model_parameters: Any = None,
-               hyperparameters: Dict[str, Any] = {},
-               contributors: 'List[Player]' = [],
+               hyperparameters: Dict[str, Any] | None = None,
+               contributors: 'List[Player] | None' = None,
                id_str: str = '',
                timestep: int = 1) -> str:
         """Creates a new commit in the current branch.
@@ -336,6 +353,7 @@ class Population:
         return id_str
 
     def branch(self, branch_name: str, id_str: str = '') -> str:
+        # TODO: Change that behavior to simply creating an alias
         """Create a new branch diverging from the current branch.
 
         Args:
@@ -367,6 +385,9 @@ class Population:
         return id_str
 
     def checkout(self, branch_name: str) -> None:
+        # TODO: Make this able to take specific commit
+        # Branches should act as commit aliases
+        # aliases should not collide with id_str
         """Set the current branch to the one specified.
 
         Args:
