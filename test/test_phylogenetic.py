@@ -82,7 +82,7 @@ class TestPhylogenetic(unittest.TestCase):
             pop.commit(model_parameters=new_DNA,
                        hyperparameters=hyperparameters)
 
-        draw(pop)
+        # draw(pop)
 
     def test_linear(self):
         pop = Population(sparsity=0)
@@ -104,7 +104,7 @@ class TestPhylogenetic(unittest.TestCase):
             pop.commit(model_parameters=new_DNA,
                        hyperparameters=hyperparameters)
 
-        draw(pop)
+        # draw(pop)
 
         nbr_nodes = 1
         node = pop._root
@@ -136,7 +136,7 @@ class TestPhylogenetic(unittest.TestCase):
             pop.commit(model_parameters=new_DNA,
                        hyperparameters=hyperparameters)
 
-        draw(pop)
+        # draw(pop)
 
         nbr_nodes = 1
         node = pop._root
@@ -168,7 +168,7 @@ class TestPhylogenetic(unittest.TestCase):
         pop.checkout("b1")
         pop.commit("5")
 
-        draw(pop)
+        # draw(pop)
 
         pop.checkout('b2')
         self.assertSetEqual(set(pop.get_branches()),
@@ -195,7 +195,7 @@ class TestPhylogenetic(unittest.TestCase):
         pop.checkout("b1")
         pop.commit("5")
 
-        draw(pop)
+        # draw(pop)
 
         pop.checkout('b2')
         self.assertSetEqual(set(pop.get_branches()),
