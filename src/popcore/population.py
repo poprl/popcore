@@ -1,7 +1,6 @@
 from typing import List, Dict, Any, Callable, Set
 from hashlib import sha1
 
-# TODO: Loading saved models
 # TODO: Saving/loading whole population (not in MVP, do later)
 # TODO: pop.fork() -> Population (not in MVP, for later)
 # TODO: pop.merge(Population) -> Population (not in MVP, for later)
@@ -143,6 +142,9 @@ class Player:
 
     def has_child(self) -> bool:
         return len(self.children) > 0
+
+    def load_model_parameters(self, load_hook: Callable[[str], Any]):
+        return load_hook(self.id_str)
 
 
 class Population:
@@ -442,6 +444,10 @@ class Population:
                 current commit.
             ValueError: If there is a collision between commit id_str.
         """
+
+        # TODO: If a model is saved in a detached pop, and the pop is then
+        # reattached, the re-hashing of the commits might make the model not
+        # loadable anymore since the id_str changed.
 
         if population._root.id_str not in self.nodes.keys():
             raise ValueError("The population's root's id_str does not match "
