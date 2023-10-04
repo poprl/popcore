@@ -414,7 +414,7 @@ class Population:
 
     def attach(self, population: 'Population',
                id_hook: Callable[[str], str] = lambda x: x,
-               auto_rehash: bool = True) -> None:
+               auto_rehash: bool = False) -> None:
         """Merges back a previously detached population.
 
         Colliding branch names will have a number appended to fix the
@@ -445,9 +445,10 @@ class Population:
             ValueError: If there is a collision between commit id_str.
         """
 
-        # TODO: If a model is saved in a detached pop, and the pop is then
+        # Warning: If a model is saved in a detached pop, and the pop is then
         # reattached, the re-hashing of the commits might make the model not
-        # loadable anymore since the id_str changed.
+        # loadable anymore since the id_str changed (so in case either id_hook
+        # is provided ot auto_rehash is true)
 
         if population._root.id_str not in self.nodes.keys():
             raise ValueError("The population's root's id_str does not match "
