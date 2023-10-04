@@ -203,6 +203,11 @@ class Population:
 
         return id_str
 
+    def __add_gen(self, player):
+        if len(self.generations) <= player.generation:
+            self.generations.append([])
+        self.generations[player.generation].append(player)
+
     def commit(self, model_parameters: Any = None,
                hyperparameters: Dict[str, Any] | None = None,
                contributors: 'List[Player] | None' = None,
@@ -276,9 +281,7 @@ class Population:
         # Update the dict of nodes
         self.nodes[id_str] = child
 
-        if len(self.generations) <= child.generation:
-            self.generations.append([])
-        self.generations[child.generation].append(child)
+        self.__add_gen(child)
 
         self.current_node = child
         self.nodes[self.current_branch] = self.current_node
@@ -474,8 +477,10 @@ class Population:
                 continue
 
             new_id_str = id_str
+
             if auto_rehash:
                 new_id_str = self.__generate_id('', player)
+
             new_id_str = id_hook(new_id_str)
             player.id_str = new_id_str
             player.branch_name = branch_renaming[player.branch_name]
@@ -486,9 +491,7 @@ class Population:
 
             self.nodes[player.id_str] = player
 
-            while len(self.generations) <= player.generation:
-                self.generations.append([])
-            self.generations[player.generation].append(player)
+            self.__add_gen(player)
 
         self.nodes.update(nodes_to_add)
         self.branches = self.branches.union(branches_to_add)
