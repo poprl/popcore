@@ -716,11 +716,3 @@ class TestPhylogenetic(unittest.TestCase):
             i += 1
 
         self.assertEqual(i+1, steps)
-
-        """recovered = node.get_model_parameters()
-
-        # Assert that the recovered agent is the same as the original one.
-        self.assertEqual(str(recovered.policy.actor.state_dict()),
-                         str(ppo_agent.policy.actor.state_dict()))
-        self.assertEqual(str(recovered.policy.critic.state_dict()),
-                         str(ppo_agent.policy.critic.state_dict()))"""
