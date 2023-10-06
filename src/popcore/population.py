@@ -292,12 +292,15 @@ class Population:
 
         return id_str
 
-    def branch(self, branch_name: str) -> str:
+    def branch(self, branch_name: str, auto_rename: bool = False) -> str:
         """Create a new branch diverging from the current branch.
 
         Args:
             branch_name (str): The name of the new branch. Must be unique.
                 This will be a new alias to the current commit
+            auto_rename (bool): If True, a number will be appended to the
+                branch name in case of conflict to automatically resolve it.
+                Defaults to False.
 
         Raises:
             ValueError: If a commit with the specified id_str already exists
@@ -306,8 +309,15 @@ class Population:
             str: The id_str of the new commit"""
 
         if branch_name in self.nodes.keys():
-            raise ValueError(f"A branch with the name '{branch_name}' already"
-                             " exists")
+            if not auto_rename:
+                raise ValueError(f"A branch with the name '{branch_name}' "
+                                 "already exists")
+            i = 1
+            new_branch_name = branch_name + str(i)
+            while new_branch_name in self.nodes.keys():
+                i += 1
+                new_branch_name = branch_name + str(i)
+            branch_name = new_branch_name
 
         self.nodes[branch_name] = self.current_node
         self.branches.add(branch_name)

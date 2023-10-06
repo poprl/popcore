@@ -453,7 +453,7 @@ def step_function(parent_parameters, hyperparameters, contributors=[]):
     return ppo_agent, hyperparameters
 
 
-class TestPhylogenetic(unittest.TestCase):
+class TestPopulationPPO(unittest.TestCase):
     def test_PPO(self):
         device = set_device()
 

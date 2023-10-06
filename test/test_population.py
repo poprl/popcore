@@ -33,7 +33,7 @@ def draw(population: Population) -> None:  # TODO: Move that
     plt.show()
 
 
-class TestPhylogenetic(unittest.TestCase):
+class TestPopulation(unittest.TestCase):
 
     def mutate(parent_parameters, hyperparameters, contributors=[]):
         new_DNA = list(parent_parameters)
@@ -76,8 +76,8 @@ class TestPhylogenetic(unittest.TestCase):
             pop.checkout(branch)
 
             hyperparameters = {"letter": letter, "spot": spot}
-            new_DNA, _ = TestPhylogenetic.mutate(pop.get_model_parameters(),
-                                                 hyperparameters)
+            new_DNA, _ = TestPopulation.mutate(pop.get_model_parameters(),
+                                               hyperparameters)
 
             pop.commit(model_parameters=new_DNA,
                        hyperparameters=hyperparameters)
@@ -97,8 +97,8 @@ class TestPhylogenetic(unittest.TestCase):
             spot = random.randrange(len(new_DNA))
 
             hyperparameters = {"letter": letter, "spot": spot}
-            new_DNA, _ = TestPhylogenetic.mutate(new_DNA,
-                                                 hyperparameters)
+            new_DNA, _ = TestPopulation.mutate(new_DNA,
+                                               hyperparameters)
             DNA_history.append(new_DNA)
 
             pop.commit(model_parameters=new_DNA,

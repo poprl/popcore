@@ -4,7 +4,7 @@ setup(
     name='popcore',
     version='0.1',
     description='Core',
-    author='Manfred Diaz',
+    author='Manfred Diaz, Aurelien Buck-Kaeffer',
     author_email='',
     url='https://www.python.org/sigs/distutils-sig/',
     package_dir={'': 'src'},
