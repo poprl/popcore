@@ -70,4 +70,4 @@ class TestAxelrod(unittest.TestCase):
                 pop.checkout(b)
                 pop.commit(p)
 
-        draw(pop)
+        # draw(pop)
