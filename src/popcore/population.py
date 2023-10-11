@@ -349,7 +349,7 @@ class Population:
         branch"""
         return self.current_node.model_parameters
 
-    def get_commit(self, id_str: str = ""):
+    def get_commit(self, id_str: str = "") -> Player:
         """Returns the commit with the given id_str if it exists.
 
         Args:
@@ -368,7 +368,7 @@ class Population:
 
         return self.nodes[id_str]
 
-    def get_commits(self, id_strs: List[str]):
+    def get_commits(self, id_strs: List[str]) -> List[Player]:
         """Returns the commit with the given id_str if it exists.
 
         Args:
