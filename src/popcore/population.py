@@ -368,6 +368,20 @@ class Population:
 
         return self.nodes[id_str]
 
+    def get_commits(self, id_strs: List[str]):
+        """Returns the commit with the given id_str if it exists.
+
+        Args:
+            id_strs (List[str]): The id_str of the commits we are trying to
+                get.
+
+        Raises:
+            KeyError: If a commit with one of the specified id_str does not
+                exist
+        """
+
+        return [self.get_commit(c) for c in id_strs]    
+
     def get_commit_history(self, id_str: str = "") -> List[str]:
         """Returns a list of all id_str of commits that came before the one
         with specified id_str.
