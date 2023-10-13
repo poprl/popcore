@@ -380,7 +380,7 @@ class Population:
                 exist
         """
 
-        return [self.get_commit(c) for c in id_strs]    
+        return [self.get_commit(c) for c in id_strs]
 
     def get_commit_history(self, id_str: str = "") -> List[str]:
         """Returns a list of all id_str of commits that came before the one
