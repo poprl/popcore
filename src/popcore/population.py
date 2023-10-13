@@ -413,6 +413,30 @@ class Population:
 
         return history
 
+    def get_descendents(self, id_str: str = "") -> List[str]:
+        """Returns a list of all id_str of commits that came after the one
+        with specified id_str, including branches.
+
+        If id_str is not specified, it will default to the current commit.
+        The list is of all commits that originate from the specified commit.
+
+        The list returned is in no particular order."""
+
+        commit: None | Player  # Mypy cries if I don't specify that
+
+        if id_str == "":
+            commit = self.current_node
+        else:
+            if id_str not in self.nodes.keys():
+                raise KeyError(f"The commit {id_str} does not exist")
+            commit = self.nodes[id_str]
+
+        history = [commit.id_str]
+        for c in commit.children:
+            history.extend(self.get_descendents(c.id_str))
+
+        return history
+
     def get_branches(self) -> Set[str]:
         """Return a set of all branches"""
         return self.branches

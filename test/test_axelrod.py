@@ -39,8 +39,10 @@ class TestAxelrod(unittest.TestCase):
     def test_axelrod(self):
 
         pop = Population()
-        players = [axl.Cooperator(), axl.Defector(),
-                   axl.TitForTat(), axl.Grudger(),
+        players = [axl.Cooperator(),
+                   axl.Defector(),
+                   axl.TitForTat(),
+                   axl.Grudger(),
                    axl.Alternator(),
                    axl.Aggravater(),
                    axl.Adaptive(),
@@ -70,4 +72,4 @@ class TestAxelrod(unittest.TestCase):
                 pop.checkout(b)
                 pop.commit(p)
 
-        # draw(pop)
+        draw(pop)
