@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt                         # type: ignore
 from networkx.drawing.nx_pydot import graphviz_layout   # type: ignore
 
 
-def draw(population: Population) -> None:  # TODO: Move that
+def draw(population: Population) -> None:
 
     """Displays the phylogenetic tree.
 
@@ -37,6 +37,7 @@ def draw(population: Population) -> None:  # TODO: Move that
 class TestAxelrod(unittest.TestCase):
 
     def test_axelrod(self):
+        """Example of usage of Population with axelrod"""
 
         pop = Population()
         players = [axl.Cooperator(),

@@ -7,6 +7,8 @@ import networkx as nx                                   # type: ignore
 import matplotlib.pyplot as plt                         # type: ignore
 from networkx.drawing.nx_pydot import graphviz_layout   # type: ignore
 
+# TODO: Write some doc to explain the tests
+
 
 def draw(population: Population) -> None:  # TODO: Move that
 
@@ -36,17 +38,17 @@ def draw(population: Population) -> None:  # TODO: Move that
 class TestPopulation(unittest.TestCase):
 
     def mutate(parent_parameters, hyperparameters, contributors=[]):
+        """Mutate a strand of DNA (replace a character in the str at random)"""
         new_DNA = list(parent_parameters)
         new_DNA[hyperparameters["spot"]] = hyperparameters["letter"]
         new_DNA = ''.join(new_DNA)
         return new_DNA, hyperparameters
 
     def test_visual_construction(self):
+        """Tree tracking the evolution of a strand of DNA along 3 evolutionary
+        paths"""
         # Visual test, uncomment the last line to see what the resulting trees
         # look like and check that they make sense.
-
-        # Suppose this is a tree tracking the evolution of a
-        # strand of DNA
 
         pop = Population()
         # tree.add_root("GGTCAACAAATCATAAAGATATTGG")  # Land snail DNA
@@ -85,6 +87,8 @@ class TestPopulation(unittest.TestCase):
         # draw(pop)
 
     def test_linear(self):
+        """This tests the correctness of the case where the population consists
+        of only a single lineage"""
         pop = Population()
 
         new_DNA = "OOOOO"
@@ -117,6 +121,8 @@ class TestPopulation(unittest.TestCase):
         assert nbr_nodes == 18
 
     def test_nonlinear(self):
+        """This tests the case where the population has multiple branches at
+        different generations"""
         pop = Population()
         pop.branch("b1")
         pop.checkout("b1")
@@ -144,6 +150,7 @@ class TestPopulation(unittest.TestCase):
         self.assertEqual(len(pop.get_commit_history()), 4)
 
     def test_detach(self):
+        """This tests the correctness of the detach/attach operations"""
         pop = Population()
         pop.branch("b1")
         pop.branch("b2")
