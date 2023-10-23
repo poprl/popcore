@@ -1,4 +1,4 @@
-from typing import List, Dict, Any, Callable, Set
+from typing import List, Dict, Any, Callable, Set, Iterator
 from hashlib import sha1
 
 # TODO: Saving/loading whole population (not in MVP, do later)
@@ -349,7 +349,7 @@ class Population:
         branch"""
         return self.current_node.model_parameters
 
-    def get_commit(self, id_str: str = "") -> Player:
+    def __get_commit(self, id_str: str = "") -> Player:
         """Returns the commit with the given id_str if it exists.
 
         Args:
@@ -368,7 +368,7 @@ class Population:
 
         return self.nodes[id_str]
 
-    def get_commits(self, id_strs: List[str]) -> List[Player]:
+    def __get_commits(self, id_strs: List[str]) -> List[Player]:
         """Returns the commit with the given id_str if it exists.
 
         Args:
@@ -380,9 +380,9 @@ class Population:
                 exist
         """
 
-        return [self.get_commit(c) for c in id_strs]
+        return [self.__get_commit(c) for c in id_strs]
 
-    def get_commit_history(self, id_str: str = "") -> List[str]:
+    def __get_commit_history(self, id_str: str = "") -> List[str]:
         """Returns a list of all id_str of commits that came before the one
         with specified id_str.
 
@@ -413,7 +413,7 @@ class Population:
 
         return history
 
-    def get_descendents(self, id_str: str = "") -> List[str]:
+    def __get_descendents(self, id_str: str = "") -> List[str]:
         """Returns a list of all id_str of commits that came after the one
         with specified id_str, including branches.
 
@@ -433,9 +433,26 @@ class Population:
 
         history = [commit.id_str]
         for c in commit.children:
-            history.extend(self.get_descendents(c.id_str))
+            history.extend(self.__get_descendents(c.id_str))
 
         return history
+
+    def walk_lineage(self, branch: str) -> Iterator[Player]:
+        """Returns an iterator with the commits in the given lineage"""
+        lineage = self.__get_commit_history(branch)[:-1]
+        for i in self.__get_commits(lineage):
+            yield i
+
+    def walk_gen(self, gen: int = -1) -> Iterator[Player]:
+        """Returns an iterator with the commits in the given generation"""
+        for i in self.generations[gen]:
+            yield i
+
+    def walk(self) -> Iterator[Player]:
+        """Returns an iterator with all the commits in the population"""
+        lineage = self.__get_descendents(self._root.id_str)[1:]
+        for i in self.__get_commits(lineage):
+            yield i
 
     def get_branches(self) -> Set[str]:
         """Return a set of all branches"""
