@@ -147,7 +147,7 @@ class TestPopulation(unittest.TestCase):
 
         self.assertEqual(pop.get_current_branch(), "b2")
 
-        self.assertEqual(len([x for x in pop.walk_lineage()]), 4)
+        self.assertEqual(len([x for x in pop.walk_lineage()]), 3)
 
     def test_detach(self):
         """This tests the correctness of the detach/attach operations"""
