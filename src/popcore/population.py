@@ -437,7 +437,7 @@ class Population:
 
         return history
 
-    def walk_lineage(self, branch: str) -> Iterator[Player]:
+    def walk_lineage(self, branch: str = "") -> Iterator[Player]:
         """Returns an iterator with the commits in the given lineage"""
         lineage = self.__get_commit_history(branch)[:-1]
         for i in self.__get_commits(lineage):
