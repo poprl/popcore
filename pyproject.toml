@@ -9,7 +9,7 @@ authors = [
     {name = "Aurélien Bück-Kaeffer", email = "aurelien.buck.kaeffer@gmail.com"},
     {name = "Manfred Diaz"}
 ]
-description = "Core"
+description = "Core Library of PopRL"
 readme = "README.md"
 requires-python = ">=3.7"
 keywords = ["RL", "poprl", "population"]
