@@ -5,7 +5,7 @@ from itertools import chain
 
 from .hooks import AutoIdHook, PreCommitHook, PostCommitHook
 from .errors import (
-    POPULATION_COMMIT_EXIST, POPUPLATION_BRANCH_EXISTS, 
+    POPULATION_COMMIT_EXIST, POPUPLATION_BRANCH_EXISTS,
     POPULATION_PLAYER_NOT_EXIST
 )
 
@@ -263,8 +263,8 @@ class Population:
             name (str): A unique identifier for the commit (like the commit
                 hash in git). If this is None, an unique name will be
                 generated using cryptographic hashing. Defaults to None
-            pre_commit_hooks (List[PreCommitHooks]): 
-            post_commit_hooks (List[PostCommitHooks]): 
+            pre_commit_hooks (List[PreCommitHooks]):
+            post_commit_hooks (List[PostCommitHooks]):
 
         Raises:
             ValueError: If a player with the specified name already exists
@@ -310,7 +310,7 @@ class Population:
         Args:
             name (str): The name of the new branch. Must be unique.
                 This will be a new alias to the current commit
-    
+
         Raises:
             ValueError: If a commit with the specified id_str already exists
 
