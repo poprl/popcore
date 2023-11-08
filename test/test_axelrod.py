@@ -2,7 +2,7 @@ import axelrod as axl   # type: ignore
 
 import unittest
 from popcore import Population
-from popcore.utils import draw
+# from popcore.utils import draw
 
 
 class TestAxelrod(unittest.TestCase):
@@ -44,4 +44,4 @@ class TestAxelrod(unittest.TestCase):
                 pop.checkout(b)
                 pop.commit(p)
 
-        draw(pop)
+        # draw(pop)

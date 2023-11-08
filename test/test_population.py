@@ -38,7 +38,7 @@ class TestPopulation(unittest.TestCase):
         for _ in range(32):
             branch = random.choice(list(pop.branches()))
 
-            if branch == "_root":
+            if branch == "main":
                 continue
 
             letter = random.choice("ACGT")
@@ -107,7 +107,7 @@ class TestPopulation(unittest.TestCase):
 
         pop.checkout('b2')
         self.assertSetEqual(pop.branches(),
-                            set(["_root", "b1", "b2", "b3"]))
+                            set(["main", "b1", "b2", "b3"]))
         self.assertEqual(len(pop.branches()), len(pop.branches()))
 
         self.assertEqual(pop.branch(), "b2")
@@ -152,10 +152,10 @@ class TestPopulation(unittest.TestCase):
         d = pop2.commit(14)
 
         self.assertEqual(len(pop2.branches()), 3)
-        self.assertEqual(len(pop2._nodes), 8)
+        self.assertEqual(len(pop2._nodes), 9)
 
         self.assertEqual(len(pop.branches()), 5)
-        self.assertEqual(len(pop._nodes), 15)
+        self.assertEqual(len(pop._nodes), 16)
 
         # draw(pop)
         # draw(pop2)
@@ -163,7 +163,7 @@ class TestPopulation(unittest.TestCase):
         pop.attach(pop2)
 
         self.assertEqual(len(pop.branches()), 8)
-        self.assertEqual(len(pop._nodes), 22)
+        self.assertEqual(len(pop._nodes), 24)
 
         pop.checkout(a)
         self.assertListEqual(

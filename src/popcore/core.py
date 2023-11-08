@@ -227,8 +227,13 @@ class Population:
         but rather create a branch for every new agent.
         """
 
+        rootbranch = "main"
         self._root = Player(
-            parent=None, name=root_name, branch=root_name)
+            parent=None, name=root_name, branch=rootbranch)
+
+        # Need to separate root.name and rootbranch otherwise if a commit is
+        # made to _root, it updates the _root branch to point at the new commit
+        # and we lose the access to the root commit.
 
         if stage_dir:
             self._stage_dir = os.path.join(stage_dir, '.pop/')
@@ -238,15 +243,16 @@ class Population:
         # A dictionary containing all commits in the tree
         # Multiple keys may refer to the same commit. In particular, branches
         # are aliases to specific commits
-        self._nodes: Dict[str, Player] = {root_name: self._root}
+        self._nodes: Dict[str, Player] = {root_name: self._root,
+                                          rootbranch: self._root}
 
         # An array of every node indexed by generation (1st gen has index 0)
         self._generations: List[List[Player]] = [[]]
 
         self._player: Player = self._root
-        self._branch: str = root_name
+        self._branch: str = rootbranch
 
-        self._branches: Set[str] = set([root_name])
+        self._branches: Set[str] = set([rootbranch])
 
         # Pre-Commit Hooks
         self._default_pre_commit_hooks = [AutoIdHook()]
@@ -524,6 +530,8 @@ class Population:
 
             # Apply branch renaming
             player.branch = branch_renaming[player.branch]
+
+            player.generation += node.generation
 
             # Apply hooks
             for hook in hooks:
