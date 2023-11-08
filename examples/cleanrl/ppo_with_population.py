@@ -107,7 +107,7 @@ def make_env(env_id, seed, idx, capture_video, run_name):
         else:
             env = gym.make(env_id)
         env = gym.wrappers.RecordEpisodeStatistics(env)
-        env.seed(seed)
+        #env.seed(seed)
         env.action_space.seed(seed)
         env.observation_space.seed(seed)
         return env
@@ -152,10 +152,7 @@ class Agent(nn.Module):
         return action, probs.log_prob(action), probs.entropy(), self.critic(x)
 
 
-if __name__ == "__main__":
-    args = parse_args()
-    run_name = (f"{args.env_id}__{args.exp_name}__"
-                f"{args.seed}__{int(time.time())}")
+def wandb_track(args):
     if args.track:
         import wandb
 
@@ -168,6 +165,55 @@ if __name__ == "__main__":
             monitor_gym=True,
             save_code=True,
         )
+
+
+def anneal(args, update, num_updates, lr):
+    if args.anneal_lr:
+        frac = 1.0 - (update - 1.0) / num_updates
+        lrnow = frac * args.learning_rate
+        return lrnow
+    return args.learning_rate
+
+
+def chart(info, global_step, writer):
+    for item in info:
+        if "episode" in item.keys():
+            print(f"global_step={global_step}, "
+                  f"episodic_return={item['episode']['r']}")
+            writer.add_scalar("charts/episodic_return",
+                              item["episode"]["r"], global_step)
+            writer.add_scalar("charts/episodic_length",
+                              item["episode"]["l"], global_step)
+            break
+
+
+def bootstrap(agent, next_obs, rewards, device,
+              args, next_done, dones, values):
+    with torch.no_grad():
+        next_value = agent.get_value(next_obs).reshape(1, -1)
+        advantages = torch.zeros_like(rewards).to(device)
+        lastgaelam = 0
+        for t in reversed(range(args.num_steps)):
+            if t == args.num_steps - 1:
+                nextnonterminal = 1.0 - next_done
+                nextvalues = next_value
+            else:
+                nextnonterminal = 1.0 - dones[t + 1]
+                nextvalues = values[t + 1]
+            delta = rewards[t] + args.gamma * nextvalues * \
+                nextnonterminal - values[t]
+            advantages[t] = lastgaelam = delta + args.gamma * \
+                args.gae_lambda * nextnonterminal * lastgaelam
+        returns = advantages + values
+
+    return advantages, returns, values
+
+
+if __name__ == "__main__":
+    args = parse_args()
+    run_name = (f"{args.env_id}__{args.exp_name}__"
+                f"{args.seed}__{int(time.time())}")
+    wandb_track(args)
     writer = SummaryWriter(f"runs/{run_name}")
     writer.add_text(
         "hyperparameters",
@@ -223,10 +269,7 @@ if __name__ == "__main__":
     )
     for update in range(1, num_updates + 1):
         # Annealing the rate if instructed to do so.
-        if args.anneal_lr:
-            frac = 1.0 - (update - 1.0) / num_updates
-            lrnow = frac * args.learning_rate
-            optimizer.param_groups[0]["lr"] = lrnow
+        optimizer.param_groups[0]["lr"] = anneal(args, update, num_updates)
 
         for step in range(0, args.num_steps):
             global_step += 1 * args.num_envs
@@ -247,33 +290,12 @@ if __name__ == "__main__":
             next_obs, next_done = torch.Tensor(next_obs).to(device), \
                 torch.Tensor(done).to(device)
 
-            for item in info:
-                if "episode" in item.keys():
-                    print(f"global_step={global_step}, "
-                          f"episodic_return={item['episode']['r']}")
-                    writer.add_scalar("charts/episodic_return",
-                                      item["episode"]["r"], global_step)
-                    writer.add_scalar("charts/episodic_length",
-                                      item["episode"]["l"], global_step)
-                    break
+            chart(info, global_step, writer)
 
         # bootstrap value if not done
-        with torch.no_grad():
-            next_value = agent.get_value(next_obs).reshape(1, -1)
-            advantages = torch.zeros_like(rewards).to(device)
-            lastgaelam = 0
-            for t in reversed(range(args.num_steps)):
-                if t == args.num_steps - 1:
-                    nextnonterminal = 1.0 - next_done
-                    nextvalues = next_value
-                else:
-                    nextnonterminal = 1.0 - dones[t + 1]
-                    nextvalues = values[t + 1]
-                delta = rewards[t] + args.gamma * nextvalues * \
-                    nextnonterminal - values[t]
-                advantages[t] = lastgaelam = delta + args.gamma * \
-                    args.gae_lambda * nextnonterminal * lastgaelam
-            returns = advantages + values
+        advantages, returns, values = bootstrap(agent, next_obs, rewards,
+                                                device, args, next_done,
+                                                dones, values)
 
         # flatten the batch
         b_obs = obs.reshape((-1,) + envs.single_observation_space.shape)
