@@ -490,10 +490,9 @@ class Population:
 
         # Warning: If a model is saved in a detached pop, and the pop is then
         # reattached, the re-hashing of the commits might make the model not
-        # loadable anymore since the id_str changed (so in case either id_hook
-        # is provided ot auto_rehash is true)
+        # loadable anymore since the id_str changed (so in case either hooks
+        # is provided or auto_rehash is true)
 
-        # TODO: Fix me
         if population._root.name not in self._nodes:
             raise ValueError(POPULATION_PLAYER_NOT_EXIST.format(
                 population._root.name))

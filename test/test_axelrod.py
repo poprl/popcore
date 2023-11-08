@@ -2,36 +2,7 @@ import axelrod as axl   # type: ignore
 
 import unittest
 from popcore import Population
-
-# Display libraries
-import networkx as nx                                   # type: ignore
-import matplotlib.pyplot as plt                         # type: ignore
-from networkx.drawing.nx_pydot import graphviz_layout   # type: ignore
-
-
-def draw(population: Population) -> None:
-
-    """Displays the phylogenetic tree.
-
-    Only parental edges are shown, contributors are ignored."""
-
-    G = nx.Graph()
-    G.add_nodes_from(population._nodes.keys())
-
-    queue = [population._root]
-
-    while len(queue):
-        node = queue[0]
-        queue = queue[1:]
-
-        for c in node.children:
-            G.add_edge(node.id_str, c.id_str)
-            queue.append(c)
-
-    pos = graphviz_layout(G, prog="dot")
-    nx.draw_networkx(G, pos, labels={x.id_str: x.model_parameters
-                                     for x in population._nodes.values()})
-    plt.show()
+from popcore.utils import draw
 
 
 class TestAxelrod(unittest.TestCase):
@@ -73,4 +44,4 @@ class TestAxelrod(unittest.TestCase):
                 pop.checkout(b)
                 pop.commit(p)
 
-        # draw(pop)
+        draw(pop)
