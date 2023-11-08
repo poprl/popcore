@@ -1,38 +1,7 @@
 import unittest
-from popcore.population import Population
 import random
 
-# Display libraries
-import networkx as nx                                   # type: ignore
-import matplotlib.pyplot as plt                         # type: ignore
-from networkx.drawing.nx_pydot import graphviz_layout   # type: ignore
-
-# TODO: Write some doc to explain the tests
-
-
-def draw(population: Population) -> None:  # TODO: Move that
-
-    """Displays the phylogenetic tree.
-
-    Only parental edges are shown, contributors are ignored."""
-
-    G = nx.Graph()
-    G.add_nodes_from(population.nodes.keys())
-
-    queue = [population._root]
-
-    while len(queue):
-        node = queue[0]
-        queue = queue[1:]
-
-        for c in node.children:
-            G.add_edge(node.id_str, c.id_str)
-            queue.append(c)
-
-    pos = graphviz_layout(G, prog="dot")
-    nx.draw_networkx(G, pos, labels={x.id_str: x.model_parameters
-                                     for x in population.nodes.values()})
-    plt.show()
+from popcore import Population
 
 
 class TestPopulation(unittest.TestCase):
@@ -84,8 +53,6 @@ class TestPopulation(unittest.TestCase):
             pop.commit(model_parameters=new_DNA,
                        hyperparameters=hyperparameters)
 
-        # draw(pop)
-
     def test_linear(self):
         """This tests the correctness of the case where the population consists
         of only a single lineage"""
@@ -107,8 +74,6 @@ class TestPopulation(unittest.TestCase):
 
             pop.commit(model_parameters=new_DNA,
                        hyperparameters=hyperparameters)
-
-        # draw(pop)
 
         nbr_nodes = 1
         node = pop._root
@@ -141,11 +106,11 @@ class TestPopulation(unittest.TestCase):
         # draw(pop)
 
         pop.checkout('b2')
-        self.assertSetEqual(set(pop.get_branches()),
+        self.assertSetEqual(set(pop.branches()),
                             set(["_root", "b1", "b2", "b3"]))
-        self.assertEqual(len(pop.get_branches()), len(set(pop.get_branches())))
+        self.assertEqual(len(pop.branches()), len(set(pop.branches())))
 
-        self.assertEqual(pop.get_current_branch(), "b2")
+        self.assertEqual(pop.branch(), "b2")
 
         self.assertEqual(len([x for x in pop.walk_lineage()]), 3)
 
@@ -192,16 +157,11 @@ class TestPopulation(unittest.TestCase):
         self.assertEqual(len(pop.branches), 5)
         self.assertEqual(len(pop.nodes), 15)
 
-        # draw(pop)
-        # draw(pop2)
-
         pop.attach(pop2, auto_rehash=False)
-
-        # draw(pop)
 
         self.assertEqual(len(pop.branches), 8)
         self.assertEqual(len(pop.nodes), 22)
 
         pop.checkout(a)
         self.assertListEqual(
-            [x.id_str for x in pop.current_node.children], [b, c, d])
+            [x.name for x in pop.current_node.children], [b, c, d])
