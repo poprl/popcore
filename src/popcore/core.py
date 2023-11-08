@@ -410,8 +410,27 @@ class Population:
             post_commit_hooks=self._default_post_commit_hooks)
         return detached_pop
 
+    def _rename_conflicting_branches(self, population: 'Population'):
+        """Every branch that generates a conflict gets renamed by adding an
+        integer at the end"""
+
+        branches_to_add = set()
+        branch_renaming = {}
+
+        for branch in population._branches:
+            new_branch = branch
+            i = 1
+            while new_branch in self._nodes.keys():
+                new_branch = branch + str(i)
+                i += 1
+
+            branches_to_add.add(new_branch)
+            branch_renaming[branch] = new_branch
+
+        return branches_to_add, branch_renaming
+
     def attach(self, population: 'Population',
-               hooks: List[AttachHook] = None,
+               hooks: List[AttachHook] | None = None,
                auto_rehash: bool = True) -> None:
         """Merges back a previously detached population.
 
@@ -455,8 +474,8 @@ class Population:
 
         # TODO: Fix me
         if population._root.name not in self._nodes.keys():
-            raise ValueError("The population's root's id_str does not match "
-                             "any known commit, hence it cannot be attached")
+            raise ValueError(POPULATION_PLAYER_NOT_EXIST.format(
+                population._root.name))
 
         # Pick the right place to reattach
         node = self._nodes[population._root.name]
@@ -467,41 +486,31 @@ class Population:
             x.parent = node
 
         nodes_to_add = {}
-        branches_to_add = set()
-        branch_renaming = {}
 
         # Rename branches in attached pop to avoid conflicts
-        for branch in population._branches:
-            new_branch = branch
-            i = 1
-            while new_branch in self._nodes.keys():
-                new_branch = branch + str(i)
-                i += 1
+        branches_to_add, branch_renaming = self._rename_conflicting_branches(
+            population)
 
-            branches_to_add.add(new_branch)
-            branch_renaming[branch] = new_branch
-
-        for id_str, player in population._nodes.items():
+        for name, player in population._nodes.items():
 
             # Ignore root node
-            if id_str == population._root.name:
+            if name == population._root.name:
                 continue
 
             # Add the renamed branches to the main pop
-            if id_str in population._branches:
-                nodes_to_add[branch_renaming[id_str]] = player
+            if name in population._branches:
+                nodes_to_add[branch_renaming[name]] = player
                 continue
 
-            # Apply branch renaming to commit attributes
+            # Apply branch renaming
             player.branch = branch_renaming[player.branch]
 
             # Apply hooks
             for hook in hooks:
                 hook(self, player)
 
-            if id_str in self._nodes.keys():
-                raise ValueError("Collision between id_str of commits from "
-                                 "both populations.")
+            if name in self._nodes.keys():
+                raise ValueError(POPULATION_COMMIT_EXIST.format(name))
 
             # Add player to the index
             self._nodes[player.name] = player
