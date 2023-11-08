@@ -1,12 +1,12 @@
 import os
 from typing import (
-    Generic, List, Dict, Any, Callable, Set, TypeVar
+    Generic, List, Dict, Any, Set, TypeVar
 )
 from itertools import chain
 
 from .hooks import (
-    AutoIdHook, Hook, PopulationPersistenceHook,
-    PreCommitHook, PostCommitHook
+    AutoIdHook, Hook, PreCommitHook, PostCommitHook, AttachHook,
+    ReIdHook
 )
 from .errors import (
     POPULATION_COMMIT_EXIST, POPUPLATION_BRANCH_EXISTS,
@@ -210,8 +210,8 @@ class Population:
         self,
         root_name: str = "_root",
         stage_dir: str = None,
-        pre_commit_hooks: List[PreCommitHook] = [],
-        post_commit_hooks: List[PostCommitHook] = [],
+        pre_commit_hooks: List[PreCommitHook] | None = None,
+        post_commit_hooks: List[PostCommitHook] | None = None,
         save_hooks: List[Hook] = [],
         load_hooks: List[Hook] = [],
     ):
@@ -226,9 +226,14 @@ class Population:
         directly to this branch if they want to track multiple separate agents,
         but rather create a branch for every new agent.
         """
+        if pre_commit_hooks is None:
+            pre_commit_hooks = []
+        if post_commit_hooks is None:
+            post_commit_hooks = []
 
         self._root = Player(
             parent=None, name=root_name, branch=root_name)
+        
         if stage_dir:
             self._stage_dir = os.path.join(stage_dir, '.pop/')
         else:
@@ -253,7 +258,7 @@ class Population:
 
         ] + post_commit_hooks
         self._default_save_hooks = [
-            PopulationPersistenceHook()
+
         ] + save_hooks
         self._default_load_hooks = [
 
@@ -271,8 +276,8 @@ class Population:
         interaction: "Interaction | None" = None,
         name: str = None,
         timestep: int = 1,
-        pre_commit_hooks: List[PreCommitHook] = [],
-        post_commit_hooks: List[PostCommitHook] = []
+        pre_commit_hooks: List[PreCommitHook] | None = None,
+        post_commit_hooks: List[PostCommitHook] | None = None
     ) -> str:
         """Creates a new commit in the current branch.
 
@@ -296,6 +301,11 @@ class Population:
         Returns:
             str: The id_str of the new commit.
         """
+
+        if pre_commit_hooks is None:
+            pre_commit_hooks = []
+        if post_commit_hooks is None:
+            post_commit_hooks = []
 
         # Create the child node
         next_player = self._player.add_descendant(
@@ -414,12 +424,15 @@ class Population:
             root_id.
         """
 
-        detached_pop = Population(root_name=self._player.name)
+        detached_pop = Population(
+            root_name=self._player.name,
+            pre_commit_hooks=self._default_pre_commit_hooks,
+            post_commit_hooks=self._default_post_commit_hooks)
         return detached_pop
 
     def attach(self, population: 'Population',
-               id_hook: Callable[[str], str] = lambda x: x,
-               auto_rehash: bool = False) -> None:
+               hooks: List[AttachHook] = None,
+               auto_rehash: bool = True) -> None:
         """Merges back a previously detached population.
 
         Colliding branch names will have a number appended to fix the
@@ -450,6 +463,11 @@ class Population:
             ValueError: If there is a collision between commit id_str.
         """
 
+        if hooks is None:
+            hooks = []
+        if auto_rehash:
+            hooks.append(ReIdHook())
+
         # Warning: If a model is saved in a detached pop, and the pop is then
         # reattached, the re-hashing of the commits might make the model not
         # loadable anymore since the id_str changed (so in case either id_hook
@@ -460,8 +478,10 @@ class Population:
             raise ValueError("The population's root's id_str does not match "
                              "any known commit, hence it cannot be attached")
 
+        # Pick the right place to reattach
         node = self._nodes[population._root.name]
 
+        # Transfer all the nodes from the other pop to the right place
         for x in population._root.descendants:
             node.descendants.append(x)
             x.parent = node
@@ -470,6 +490,7 @@ class Population:
         branches_to_add = set()
         branch_renaming = {}
 
+        # Rename branches in attached pop to avoid conflicts
         for branch in population._branches:
             new_branch = branch
             i = 1
@@ -482,30 +503,32 @@ class Population:
 
         for id_str, player in population._nodes.items():
 
+            # Ignore root node
             if id_str == population._root.name:
                 continue
 
+            # Add the renamed branches to the main pop
             if id_str in population._branches:
                 nodes_to_add[branch_renaming[id_str]] = player
                 continue
 
-            new_id_str = id_str
-
-            if auto_rehash:
-                new_id_str = self._generate_id('', player)
-
-            new_id_str = id_hook(new_id_str)
-            player.name = new_id_str
+            # Apply branch renaming to commit attributes
             player.branch = branch_renaming[player.branch]
+
+            # Apply hooks
+            for hook in hooks:
+                hook(self, player)
 
             if id_str in self._nodes.keys():
                 raise ValueError("Collision between id_str of commits from "
                                  "both populations.")
 
+            # Add player to the index
             self._nodes[player.name] = player
 
             self._add_gen(player)
 
+        # Add branches to the index
         self._nodes.update(nodes_to_add)
         self._branches = self._branches.union(branches_to_add)
 

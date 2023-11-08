@@ -99,7 +99,7 @@ def lineage(
         population: Population, branch: str = None) -> Iterator[Player]:
     """Returns an iterator with the commits in the given lineage"""
     # TODO: Document the parameters
-    lineage = _get_ancesters(branch)[:-1]
+    lineage = _get_ancesters(population, branch)[:-1]
     for player in _get_players(population, lineage):
         yield player
 

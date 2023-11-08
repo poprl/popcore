@@ -51,7 +51,7 @@ class TestAxelrod(unittest.TestCase):
                    axl.ArrogantQLearner(),
                    axl.Bully()]
 
-        branches = [pop.branch(str(p), auto_rename=True) for p in players]
+        branches = [pop.branch(str(p)) for p in players]
 
         for p, b in zip(players, branches):
             pop.checkout(b)
@@ -65,7 +65,7 @@ class TestAxelrod(unittest.TestCase):
             last = results.ranking[-1]
 
             pop.checkout(branches[first])
-            branches[last] = pop.branch(str(players[first]), auto_rename=True)
+            branches[last] = pop.branch(str(players[first]) + str(x))
 
             players[last] = players[first]
 
