@@ -130,7 +130,6 @@ class Player:
 
         # Create child node
         descendant = Player(
-            self,
             name=name,
             parameters=parameters,
             hyperparameters=hyperparameters,
@@ -201,8 +200,13 @@ class Population:
     The structure is meant to be similar to that of a git repository, where
     every branch corresponds to an agent."""
 
-    def __init__(self, root_name: str = "_root"):
-        """Instantiates population of agents.
+    def __init__(
+        self,
+        root_name: str = "_root",
+        pre_commit_hooks: List[PreCommitHook] = [],
+        post_commit_hooks: List[PostCommitHook] = []
+    ):
+        """Instantiates population of players.
 
         This is a data structure that records the evolution of populations of
         agents. It behaves like a git repository, where each branch is a
@@ -219,26 +223,26 @@ class Population:
         # A dictionary containing all commits in the tree
         # Multiple keys may refer to the same commit. In particular, branches
         # are aliases to specific commits
-        self.nodes: Dict[str, Player] = {root_name: self._root}
+        self._nodes: Dict[str, Player] = {root_name: self._root}
 
         # An array of every node indexed by generation (1st gen has index 0)
-        self.generations: List[List[Player]] = [[]]
+        self._generations: List[List[Player]] = [[]]
 
-        self.player: Player = self._root
+        self._player: Player = self._root
         self._branch: str = root_name
 
         self._branches: Set[str] = set([root_name])
         self._default_pre_commit_hooks = [
             AutoIdHook()
-        ]
+        ] + pre_commit_hooks
         self._default_post_commit_hooks = [
 
-        ]
+        ] + post_commit_hooks
 
     def _add_gen(self, player: Player):
-        if len(self.generations) <= player.generation:
-            self.generations.append([])
-        self.generations[player.generation].append(player)
+        if len(self._generations) <= player.generation:
+            self._generations.append([])
+        self._generations[player.generation].append(player)
 
     def commit(
         self,
@@ -247,8 +251,8 @@ class Population:
         interaction: "Interaction | None" = None,
         name: str = None,
         timestep: int = 1,
-        pre_commit_hooks: List[PreCommitHook] = None,
-        post_commit_hooks: List[PostCommitHook] = None
+        pre_commit_hooks: List[PreCommitHook] = [],
+        post_commit_hooks: List[PostCommitHook] = []
     ) -> str:
         """Creates a new commit in the current branch.
 
@@ -274,7 +278,7 @@ class Population:
         """
 
         # Create the child node
-        next_player = self.player.add_descendant(
+        next_player = self._player.add_descendant(
             name=name,
             parameters=parameters,
             hyperparameters=hyperparameters,
@@ -283,23 +287,23 @@ class Population:
             branch=self._branch
         )
 
-        # TODO: Pre Commit Hook Logic
         for hook in chain(
             self._default_pre_commit_hooks, pre_commit_hooks
         ):
             hook(self, next_player)
 
-        if next_player.name in self.nodes.keys():
+        if next_player.name in self._nodes.keys():
             raise ValueError(POPULATION_COMMIT_EXIST.format(name))
-        self.nodes[next_player.name] = next_player
+        self._nodes[next_player.name] = next_player
 
         self._add_gen(next_player)
 
-        self.player = next_player
-        self.nodes[self._branch] = self.player
+        self._player = next_player
+        self._nodes[self._branch] = self._player
 
-        # TODO: Post Commit Hook Logic
-        for hook in post_commit_hooks:
+        for hook in chain(
+            self._default_post_commit_hooks, post_commit_hooks
+        ):
             hook(self, next_player)
 
         return next_player.name
@@ -317,13 +321,27 @@ class Population:
         Returns:
             str: The id_str of the new commit"""
 
-        if name in self.nodes.keys():
+        if name in self._nodes.keys():
             raise ValueError(POPUPLATION_BRANCH_EXISTS.format(name))
 
-        self.nodes[name] = self.player
+        self._nodes[name] = self._player
         self._branches.add(name)
 
         return name
+
+    def save(self, f):
+        """
+            Save the state of the population
+        """
+        # TODO:
+        raise NotImplementedError()
+
+    def load(self, f):
+        """
+            Load the state of the population
+        """
+        # TODO:
+        raise NotImplementedError()
 
     def checkout(self, name: str) -> None:
         """Set the current branch to the one specified.
@@ -334,15 +352,15 @@ class Population:
         Raises:
             ValueError: If there is no branch with the specified name"""
 
-        if name not in self.nodes.keys():
+        if name not in self._nodes.keys():
             raise ValueError(POPULATION_PLAYER_NOT_EXIST.format(name))
 
-        self.player = self.nodes[name]
+        self._player = self._nodes[name]
 
         if name in self._branches:
             self._branch = name
         else:
-            self._branch = self.player.branch
+            self._branch = self._player.branch
 
     def __get_commit(self, name: str = None) -> Player:
         """Returns the commit with the given id_str if it exists.
@@ -356,12 +374,12 @@ class Population:
             ValueError: If a commit with the specified `name` does not exist"""
 
         if name is None:
-            return self.player
+            return self._player
 
-        if name not in self.nodes.keys():
+        if name not in self._nodes.keys():
             raise ValueError(POPULATION_PLAYER_NOT_EXIST.format(name))
 
-        return self.nodes[name]
+        return self._nodes[name]
 
     def __get_commits(self, id_strs: List[str]) -> List[Player]:
         """Returns the commit with the given id_str if it exists.
@@ -394,11 +412,11 @@ class Population:
         commit: None | Player  # Mypy cries if I don't specify that
 
         if id_str == "":
-            commit = self.player
+            commit = self._player
         else:
-            if id_str not in self.nodes.keys():
+            if id_str not in self._nodes.keys():
                 raise KeyError(f"The commit {id_str} does not exist")
-            commit = self.nodes[id_str]
+            commit = self._nodes[id_str]
 
         history = [commit.name]
         commit = commit.parent
@@ -420,11 +438,11 @@ class Population:
         commit: None | Player  # Mypy cries if I don't specify that
 
         if id_str == "":
-            commit = self.player
+            commit = self._player
         else:
-            if id_str not in self.nodes.keys():
+            if id_str not in self._nodes.keys():
                 raise KeyError(f"The commit {id_str} does not exist")
-            commit = self.nodes[id_str]
+            commit = self._nodes[id_str]
 
         history = [commit.name]
         for c in commit.descendants:
@@ -440,7 +458,7 @@ class Population:
 
     def walk_gen(self, gen: int = -1) -> Iterator[Player]:
         """Returns an iterator with the commits in the given generation"""
-        for i in self.generations[gen]:
+        for i in self._generations[gen]:
             yield i
 
     def walk(self) -> Iterator[Player]:
@@ -469,7 +487,7 @@ class Population:
             root_id.
         """
 
-        detached_pop = Population(root_name=self.player.name)
+        detached_pop = Population(root_name=self._player.name)
         return detached_pop
 
     def attach(self, population: 'Population',
@@ -510,11 +528,11 @@ class Population:
         # loadable anymore since the id_str changed (so in case either id_hook
         # is provided ot auto_rehash is true)
 
-        if population._root.name not in self.nodes.keys():
+        if population._root.name not in self._nodes.keys():
             raise ValueError("The population's root's id_str does not match "
                              "any known commit, hence it cannot be attached")
 
-        node = self.nodes[population._root.name]
+        node = self._nodes[population._root.name]
 
         for x in population._root.descendants:
             node.descendants.append(x)
@@ -527,14 +545,14 @@ class Population:
         for branch in population._branches:
             new_branch = branch
             i = 1
-            while new_branch in self.nodes.keys():
+            while new_branch in self._nodes.keys():
                 new_branch = branch + str(i)
                 i += 1
 
             branches_to_add.add(new_branch)
             branch_renaming[branch] = new_branch
 
-        for id_str, player in population.nodes.items():
+        for id_str, player in population._nodes.items():
 
             if id_str == population._root.name:
                 continue
@@ -552,13 +570,13 @@ class Population:
             player.name = new_id_str
             player.branch = branch_renaming[player.branch]
 
-            if id_str in self.nodes.keys():
+            if id_str in self._nodes.keys():
                 raise ValueError("Collision between id_str of commits from "
                                  "both populations.")
 
-            self.nodes[player.name] = player
+            self._nodes[player.name] = player
 
             self._add_gen(player)
 
-        self.nodes.update(nodes_to_add)
+        self._nodes.update(nodes_to_add)
         self._branches = self._branches.union(branches_to_add)

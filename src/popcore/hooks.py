@@ -4,7 +4,7 @@ from typing import Any
 from hashlib import sha1
 
 
-from . import Population, Player
+import popcore as core
 
 
 class Hook:
@@ -22,13 +22,13 @@ class PreCommitHook(Hook):
     """
     @abstractmethod
     def _pre(
-        self, population: Population, player: Player,
+        self, population: 'core.Population', player: 'core.Player',
         *args: Any, **kwds: Any
     ):
         raise NotImplementedError()
 
     def __call__(
-        self, population: Population, player: Player,
+        self, population: 'core.Population', player: 'core.Player',
         *args: Any, **kwds: Any
     ) -> Any:
         return self._pre(population, player, args=args, kwds=kwds)
@@ -40,13 +40,13 @@ class PostCommitHook(Hook):
     """
     @abstractmethod
     def _post(
-        self, population: Population, player: Player,
+        self, population: 'core.Population', player: 'core.Player',
         *args: Any, **kwds: Any
     ):
         raise NotImplementedError()
 
     def __call__(
-        self, population: Population, player: Player,
+        self, population: 'core.Population', player: 'core.Player',
         *args: Any, **kwds: Any
     ) -> Any:
         return self._post(population, player, args=args, kwds=kwds)
@@ -55,20 +55,16 @@ class PostCommitHook(Hook):
 class AutoIdHook(PreCommitHook):
 
     def _pre(
-        self, population: Population, player: Player,
+        self, population: 'core.Population', player: 'core.Player',
         *args: Any, **kwds: Any
     ):
         if player.name is not None:
             return player.name
 
-        node = population.player
+        node = population._player
         path = ''
         while node is not None:
             path += str(node)
             node = node.parent
 
         player.name = sha1(path.encode()).hexdigest()
-
-
-class PersistenceHook(Hook):
-    pass

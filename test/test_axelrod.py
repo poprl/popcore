@@ -1,7 +1,7 @@
 import axelrod as axl   # type: ignore
 
 import unittest
-from popcore.population import Population
+from popcore import Population
 
 # Display libraries
 import networkx as nx                                   # type: ignore
@@ -16,7 +16,7 @@ def draw(population: Population) -> None:
     Only parental edges are shown, contributors are ignored."""
 
     G = nx.Graph()
-    G.add_nodes_from(population.nodes.keys())
+    G.add_nodes_from(population._nodes.keys())
 
     queue = [population._root]
 
@@ -30,7 +30,7 @@ def draw(population: Population) -> None:
 
     pos = graphviz_layout(G, prog="dot")
     nx.draw_networkx(G, pos, labels={x.id_str: x.model_parameters
-                                     for x in population.nodes.values()})
+                                     for x in population._nodes.values()})
     plt.show()
 
 
