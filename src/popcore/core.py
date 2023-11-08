@@ -1,5 +1,5 @@
 from typing import (
-    Generic, List, Dict, Any, Callable, Set, Iterator, TypeVar
+    Generic, List, Dict, Any, Callable, Set, TypeVar
 )
 from itertools import chain
 
@@ -317,7 +317,8 @@ class Population:
                 returns the name of the active branch
 
         Raises:
-            ValueError: If a player with the specified name/alias already exists
+            ValueError: If a player with the specified name/alias already
+            exists
 
         Returns:
             str: The name of the new commit"""
