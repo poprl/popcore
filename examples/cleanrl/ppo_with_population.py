@@ -1,3 +1,4 @@
+# flake8: noqa
 # docs and experiment results can be found at https://docs.cleanrl.dev/rl-algorithms/ppo/#ppopy
 import argparse
 import os
