@@ -1,5 +1,5 @@
 from typing import (
-    Generic, List, Dict, Any, Callable, Set, TypeVar
+    Generic, List, Dict, Any, Set, TypeVar
 )
 from itertools import chain
 

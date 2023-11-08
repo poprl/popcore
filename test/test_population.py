@@ -3,8 +3,6 @@ from popcore.core import Population
 from popcore.iterators import lineage
 import random
 
-from popcore import Population
-
 
 class TestPopulation(unittest.TestCase):
 
