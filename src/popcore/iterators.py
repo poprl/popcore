@@ -3,7 +3,7 @@ from . import Population, Player
 from .errors import POPULATION_PLAYER_NOT_EXIST
 
 
-def _get_commit(population: Population, name: str = None) -> Player:
+def _get_player(population: Population, name: str = None) -> Player:
     """Returns the commit with the given id_str if it exists.
 
     Args:
@@ -23,7 +23,7 @@ def _get_commit(population: Population, name: str = None) -> Player:
     return population._nodes[name]
 
 
-def _get_commits(population: Population, names: List[str]) -> List[Player]:
+def _get_players(population: Population, names: List[str]) -> List[Player]:
     """Returns the commit with the given id_str if it exists.
 
     Args:
@@ -35,10 +35,10 @@ def _get_commits(population: Population, names: List[str]) -> List[Player]:
             exist
     """
 
-    return [_get_commit(population, name) for name in names]
+    return [_get_player(population, name) for name in names]
 
 
-def _get_commit_history(population: Population, name: str = None) -> List[str]:
+def _get_ancesters(population: Population, name: str = None) -> List[str]:
     """Returns a list of all id_str of commits that came before the one
     with specified id_str.
 
@@ -99,24 +99,24 @@ def lineage(
         population: Population, branch: str = None) -> Iterator[Player]:
     """Returns an iterator with the commits in the given lineage"""
     # TODO: Document the parameters
-    lineage = _get_commit_history(branch)[:-1]
-    for player in _get_commits(population, lineage):
+    lineage = _get_ancesters(branch)[:-1]
+    for player in _get_players(population, lineage):
         yield player
 
 
 def generation(
         population: Population, generation: int = -1) -> Iterator[Player]:
-    """Returns an iterator with the commits in the given generation"""
+    """Returns an iterator with the players in the given generation"""
     # TODO: Document the parameters
     for player in population._generations[generation]:
         yield player
 
 
 def flatten(population: Population) -> Iterator[Player]:
-    """Returns an iterator with all the commits in the population"""
+    """Returns an iterator with all the players in the population"""
     # TODO: Document the parameters
     lineage = _get_descendents(population, population._root.name)[1:]
-    for player in _get_commits(population, lineage):
+    for player in _get_players(population, lineage):
         yield player
 
 
