@@ -3,7 +3,7 @@ from typing import (
 )
 from itertools import chain
 
-from .hooks import AutoIdHook, PreCommitHook, PostCommitHook
+from .hooks import AutoIdHook, Hook, PreCommitHook, PostCommitHook
 from .errors import (
     POPULATION_COMMIT_EXIST, POPUPLATION_BRANCH_EXISTS,
     POPULATION_PLAYER_NOT_EXIST
@@ -333,14 +333,22 @@ class Population:
 
         return name
 
-    def save(self, f):
+    def save(
+        self,
+        path: str,
+        save_hooks: List[Hook] = []
+    ):
         """
             Save the state of the population
         """
         # TODO:
         raise NotImplementedError()
 
-    def load(self, f):
+    def load(
+        self,
+        path: str,
+        load_hooks: List[Hook] = []
+    ):
         """
             Load the state of the population
         """
@@ -356,7 +364,7 @@ class Population:
         Raises:
             ValueError: If there is no branch with the specified name"""
 
-        if name not in self._nodes.keys():
+        if name not in self._nodes:
             raise ValueError(POPULATION_PLAYER_NOT_EXIST.format(name))
 
         self._player = self._nodes[name]
@@ -423,6 +431,7 @@ class Population:
         # loadable anymore since the id_str changed (so in case either id_hook
         # is provided ot auto_rehash is true)
 
+        # TODO: Fix me
         if population._root.name not in self._nodes.keys():
             raise ValueError("The population's root's id_str does not match "
                              "any known commit, hence it cannot be attached")

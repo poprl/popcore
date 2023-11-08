@@ -112,7 +112,8 @@ def generation(
         yield player
 
 
-def flatten(population: Population) -> Iterator[Player]:
+def flatten(
+        population: Population) -> Iterator[Player]:
     """Returns an iterator with all the players in the population"""
     # TODO: Document the parameters
     lineage = _get_descendents(population, population._root.name)[1:]
