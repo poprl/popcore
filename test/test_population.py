@@ -1,5 +1,6 @@
 import unittest
-from popcore.population import Population
+from popcore.core import Population
+from popcore.iterators import lineage
 import random
 
 # Display libraries
@@ -17,7 +18,7 @@ def draw(population: Population) -> None:  # TODO: Move that
     Only parental edges are shown, contributors are ignored."""
 
     G = nx.Graph()
-    G.add_nodes_from(population.nodes.keys())
+    G.add_nodes_from(population._nodes.keys())
 
     queue = [population._root]
 
@@ -25,13 +26,13 @@ def draw(population: Population) -> None:  # TODO: Move that
         node = queue[0]
         queue = queue[1:]
 
-        for c in node.children:
-            G.add_edge(node.id_str, c.id_str)
+        for c in node.descendants:
+            G.add_edge(node.name, c.name)
             queue.append(c)
 
     pos = graphviz_layout(G, prog="dot")
-    nx.draw_networkx(G, pos, labels={x.id_str: x.model_parameters
-                                     for x in population.nodes.values()})
+    nx.draw_networkx(G, pos, labels={x.name: x.parameters
+                                     for x in population._nodes.values()})
     plt.show()
 
 
@@ -58,16 +59,16 @@ class TestPopulation(unittest.TestCase):
         pop.branch("Lineage 3")
 
         pop.checkout("Lineage 1")
-        pop.commit(model_parameters=new_DNA)
+        pop.commit(parameters=new_DNA)
 
         pop.checkout("Lineage 2")
-        pop.commit(model_parameters=new_DNA)
+        pop.commit(parameters=new_DNA)
 
         pop.checkout("Lineage 3")
-        pop.commit(model_parameters=new_DNA)
+        pop.commit(parameters=new_DNA)
 
         for _ in range(32):
-            branch = random.choice(list(pop.branches))
+            branch = random.choice(list(pop.branches()))
 
             if branch == "_root":
                 continue
@@ -78,10 +79,10 @@ class TestPopulation(unittest.TestCase):
             pop.checkout(branch)
 
             hyperparameters = {"letter": letter, "spot": spot}
-            new_DNA, _ = TestPopulation.mutate(pop.get_model_parameters(),
+            new_DNA, _ = TestPopulation.mutate(pop._player.parameters,
                                                hyperparameters)
 
-            pop.commit(model_parameters=new_DNA,
+            pop.commit(parameters=new_DNA,
                        hyperparameters=hyperparameters)
 
         # draw(pop)
@@ -94,7 +95,7 @@ class TestPopulation(unittest.TestCase):
         new_DNA = "OOOOO"
         DNA_history = [new_DNA]
 
-        pop.commit(model_parameters=new_DNA)
+        pop.commit(parameters=new_DNA)
 
         for x in range(16):
             letter = random.choice("ACGT")
@@ -105,18 +106,18 @@ class TestPopulation(unittest.TestCase):
                                                hyperparameters)
             DNA_history.append(new_DNA)
 
-            pop.commit(model_parameters=new_DNA,
+            pop.commit(parameters=new_DNA,
                        hyperparameters=hyperparameters)
 
         # draw(pop)
 
         nbr_nodes = 1
         node = pop._root
-        while len(node.children):
+        while len(node.descendants):
             nbr_nodes += 1
-            assert len(node.children) == 1
-            node = node.children[0]
-            assert node.model_parameters == DNA_history[nbr_nodes-2]
+            assert len(node.descendants) == 1
+            node = node.descendants[0]
+            assert node.parameters == DNA_history[nbr_nodes-2]
 
         assert nbr_nodes == 18
 
@@ -141,13 +142,13 @@ class TestPopulation(unittest.TestCase):
         # draw(pop)
 
         pop.checkout('b2')
-        self.assertSetEqual(set(pop.get_branches()),
+        self.assertSetEqual(pop.branches(),
                             set(["_root", "b1", "b2", "b3"]))
-        self.assertEqual(len(pop.get_branches()), len(set(pop.get_branches())))
+        self.assertEqual(len(pop.branches()), len(pop.branches()))
 
-        self.assertEqual(pop.get_current_branch(), "b2")
+        self.assertEqual(pop.branch(), "b2")
 
-        self.assertEqual(len([x for x in pop.walk_lineage()]), 3)
+        self.assertEqual(len([x for x in lineage(pop)]), 3)
 
     def test_detach(self):
         """This tests the correctness of the detach/attach operations"""
@@ -183,25 +184,25 @@ class TestPopulation(unittest.TestCase):
         pop2.commit(12)
         pop2.checkout("b3")
         pop2.commit(13)
-        pop2.checkout(pop2._root.id_str)
+        pop2.checkout(pop2._root.name)
         d = pop2.commit(14)
 
-        self.assertEqual(len(pop2.branches), 3)
-        self.assertEqual(len(pop2.nodes), 8)
+        self.assertEqual(len(pop2.branches()), 3)
+        self.assertEqual(len(pop2._nodes), 8)
 
-        self.assertEqual(len(pop.branches), 5)
-        self.assertEqual(len(pop.nodes), 15)
+        self.assertEqual(len(pop.branches()), 5)
+        self.assertEqual(len(pop._nodes), 15)
 
         # draw(pop)
         # draw(pop2)
 
-        pop.attach(pop2, auto_rehash=False)
+        pop.attach(pop2)
 
         # draw(pop)
 
-        self.assertEqual(len(pop.branches), 8)
-        self.assertEqual(len(pop.nodes), 22)
+        self.assertEqual(len(pop.branches()), 8)
+        self.assertEqual(len(pop._nodes), 22)
 
         pop.checkout(a)
         self.assertListEqual(
-            [x.id_str for x in pop.current_node.children], [b, c, d])
+            [x.name for x in pop._player.descendants], [b, c, d])

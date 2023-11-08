@@ -51,6 +51,24 @@ class PostCommitHook(Hook):
         return self._post(population, player, args=args, kwds=kwds)
 
 
+class AttachHook(Hook):
+    """
+       AttachHook
+    """
+    @abstractmethod
+    def _attach(
+        self, population: 'core.Population', player: 'core.Player',
+        *args: Any, **kwds: Any
+    ):
+        raise NotImplementedError()
+
+    def __call__(
+        self, population: 'core.Population', player: 'core.Player',
+        *args: Any, **kwds: Any
+    ) -> Any:
+        return self._attach(population, player, args=args, kwds=kwds)
+
+
 class AutoIdHook(PreCommitHook):
 
     def _pre(
@@ -60,7 +78,25 @@ class AutoIdHook(PreCommitHook):
         if player.name is not None:
             return player.name
 
-        node = population._player
+        node = player
+        path = ''
+        while node is not None:
+            path += str(node)
+            node = node.parent
+
+        player.name = sha1(path.encode()).hexdigest()
+
+
+class ReIdHook(AttachHook):
+
+    def _attach(
+        self, population: 'core.Population', player: 'core.Player',
+        *args: Any, **kwds: Any
+    ):
+        if player.name is not None:
+            return player.name
+
+        node = player
         path = ''
         while node is not None:
             path += str(node)
