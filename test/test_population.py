@@ -3,37 +3,7 @@ from popcore.core import Population
 from popcore.iterators import lineage
 import random
 
-# Display libraries
-import networkx as nx                                   # type: ignore
-import matplotlib.pyplot as plt                         # type: ignore
-from networkx.drawing.nx_pydot import graphviz_layout   # type: ignore
-
-# TODO: Write some doc to explain the tests
-
-
-def draw(population: Population) -> None:  # TODO: Move that
-
-    """Displays the phylogenetic tree.
-
-    Only parental edges are shown, contributors are ignored."""
-
-    G = nx.Graph()
-    G.add_nodes_from(population._nodes.keys())
-
-    queue = [population._root]
-
-    while len(queue):
-        node = queue[0]
-        queue = queue[1:]
-
-        for c in node.descendants:
-            G.add_edge(node.name, c.name)
-            queue.append(c)
-
-    pos = graphviz_layout(G, prog="dot")
-    nx.draw_networkx(G, pos, labels={x.name: x.parameters
-                                     for x in population._nodes.values()})
-    plt.show()
+from popcore import Population
 
 
 class TestPopulation(unittest.TestCase):
@@ -85,8 +55,6 @@ class TestPopulation(unittest.TestCase):
             pop.commit(parameters=new_DNA,
                        hyperparameters=hyperparameters)
 
-        # draw(pop)
-
     def test_linear(self):
         """This tests the correctness of the case where the population consists
         of only a single lineage"""
@@ -108,8 +76,6 @@ class TestPopulation(unittest.TestCase):
 
             pop.commit(parameters=new_DNA,
                        hyperparameters=hyperparameters)
-
-        # draw(pop)
 
         nbr_nodes = 1
         node = pop._root
@@ -196,9 +162,7 @@ class TestPopulation(unittest.TestCase):
         # draw(pop)
         # draw(pop2)
 
-        pop.attach(pop2)
-
-        # draw(pop)
+        pop.attach(pop2, auto_rehash=False)
 
         self.assertEqual(len(pop.branches()), 8)
         self.assertEqual(len(pop._nodes), 22)

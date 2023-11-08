@@ -17,6 +17,7 @@ def draw(population: Population):
 
     queue: List[Player] = [population._root]
 
+    # TODO: Use an iterator from .iterators instead of this.
     while len(queue):
         node = queue[0]
         queue = queue[1:]
