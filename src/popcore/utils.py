@@ -32,4 +32,3 @@ def draw(population: Population):
         labels={x.name: x.name for x in population.nodes.values()}
     )
     plt.show()
-
