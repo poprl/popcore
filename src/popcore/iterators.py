@@ -17,7 +17,7 @@ def _get_player(population: Population, name: str = None) -> Player:
     if name is None:
         return population._player
 
-    if name not in population._nodes.keys():
+    if name not in population._nodes:
         raise ValueError(POPULATION_PLAYER_NOT_EXIST.format(name))
 
     return population._nodes[name]
@@ -57,7 +57,7 @@ def _get_ancesters(population: Population, name: str = None) -> List[str]:
     if name is None:
         player = population._player
     else:
-        if name not in population._nodes.keys():
+        if name not in population._nodes:
             raise ValueError(POPULATION_PLAYER_NOT_EXIST.format(name))
         player = population._nodes[name]
 
@@ -84,7 +84,7 @@ def _get_descendents(population: Population, name: str = None) -> List[str]:
     if name is None:
         player = population._player
     else:
-        if name not in population._nodes.keys():
+        if name not in population._nodes:
             raise ValueError(POPULATION_PLAYER_NOT_EXIST.format(name))
         player = population._nodes[name]
 
