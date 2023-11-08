@@ -112,7 +112,7 @@ def generation(
         yield player
 
 
-def tree(population: Population) -> Iterator[Player]:
+def flatten(population: Population) -> Iterator[Player]:
     """Returns an iterator with all the commits in the population"""
     # TODO: Document the parameters
     lineage = _get_descendents(population, population._root.name)[1:]
@@ -121,7 +121,7 @@ def tree(population: Population) -> Iterator[Player]:
 
 
 __all__ = [
-    'tree',
+    'flatten',
     'lineage',
     'generation'
 ]
