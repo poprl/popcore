@@ -308,18 +308,22 @@ class Population:
 
         return next_player.name
 
-    def branch(self, name: str, auto_name: bool = False) -> str:
+    def branch(self, name: str = None, auto_name: bool = False) -> str:
         """Create a new branch diverging from the current branch.
 
         Args:
             name (str): The name of the new branch. Must be unique.
-                This will be a new alias to the current commit
+                This will be a new alias to the current commit. If None, it
+                returns the name of the active branch
 
         Raises:
-            ValueError: If a commit with the specified id_str already exists
+            ValueError: If a player with the specified name/alias already exists
 
         Returns:
-            str: The id_str of the new commit"""
+            str: The name of the new commit"""
+
+        if name is None:
+            return self._branch
 
         if name in self._nodes.keys():
             raise ValueError(POPUPLATION_BRANCH_EXISTS.format(name))
@@ -362,118 +366,9 @@ class Population:
         else:
             self._branch = self._player.branch
 
-    def __get_commit(self, name: str = None) -> Player:
-        """Returns the commit with the given id_str if it exists.
-
-        Args:
-            name (str): The name of the commit we are trying to get. If
-                id_str is the empty string, returns the latest commit of the
-                current branch. Defaults to the empty string.
-
-        Raises:
-            ValueError: If a commit with the specified `name` does not exist"""
-
-        if name is None:
-            return self._player
-
-        if name not in self._nodes.keys():
-            raise ValueError(POPULATION_PLAYER_NOT_EXIST.format(name))
-
-        return self._nodes[name]
-
-    def __get_commits(self, id_strs: List[str]) -> List[Player]:
-        """Returns the commit with the given id_str if it exists.
-
-        Args:
-            id_strs (List[str]): The id_str of the commits we are trying to
-                get.
-
-        Raises:
-            KeyError: If a commit with one of the specified id_str does not
-                exist
-        """
-
-        return [self.__get_commit(c) for c in id_strs]
-
-    def __get_commit_history(self, id_str: str = "") -> List[str]:
-        """Returns a list of all id_str of commits that came before the one
-        with specified id_str.
-
-        If id_str is not specified, it will return the commit history of the
-        latest commit of the current branch.
-        The list is of all commits that led to the specified commit. This
-        means that commits from sister branches will not be included even if
-        they may be more recent. However commits from ancestor branches would
-        be included, up to _root.
-
-        The list returned is in inverse chronological order, so the most
-        recent commit appears first, and the oldest last."""
-
-        commit: None | Player  # Mypy cries if I don't specify that
-
-        if id_str == "":
-            commit = self._player
-        else:
-            if id_str not in self._nodes.keys():
-                raise KeyError(f"The commit {id_str} does not exist")
-            commit = self._nodes[id_str]
-
-        history = [commit.name]
-        commit = commit.parent
-        while commit is not None:
-            history.append(commit.name)
-            commit = commit.parent
-
-        return history
-
-    def __get_descendents(self, id_str: str = "") -> List[str]:
-        """Returns a list of all id_str of commits that came after the one
-        with specified id_str, including branches.
-
-        If id_str is not specified, it will default to the current commit.
-        The list is of all commits that originate from the specified commit.
-
-        The list returned is in no particular order."""
-
-        commit: None | Player  # Mypy cries if I don't specify that
-
-        if id_str == "":
-            commit = self._player
-        else:
-            if id_str not in self._nodes.keys():
-                raise KeyError(f"The commit {id_str} does not exist")
-            commit = self._nodes[id_str]
-
-        history = [commit.name]
-        for c in commit.descendants:
-            history.extend(self.__get_descendents(c.name))
-
-        return history
-
-    def walk_lineage(self, branch: str = "") -> Iterator[Player]:
-        """Returns an iterator with the commits in the given lineage"""
-        lineage = self.__get_commit_history(branch)[:-1]
-        for i in self.__get_commits(lineage):
-            yield i
-
-    def walk_gen(self, gen: int = -1) -> Iterator[Player]:
-        """Returns an iterator with the commits in the given generation"""
-        for i in self._generations[gen]:
-            yield i
-
-    def walk(self) -> Iterator[Player]:
-        """Returns an iterator with all the commits in the population"""
-        lineage = self.__get_descendents(self._root.name)[1:]
-        for i in self.__get_commits(lineage):
-            yield i
-
     def branches(self) -> Set[str]:
         """Return a set of all branches"""
         return self._branches
-
-    def get_current_branch(self) -> str:
-        """Return the name of the current branch"""
-        return self._branch
 
     def detach(self) -> 'Population':
         """Creates a Population with the current commit's id_str as root_id.
