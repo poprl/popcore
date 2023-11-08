@@ -1,9 +1,13 @@
+import os
 from typing import (
     Generic, List, Dict, Any, Callable, Set, TypeVar
 )
 from itertools import chain
 
-from .hooks import AutoIdHook, Hook, PreCommitHook, PostCommitHook
+from .hooks import (
+    AutoIdHook, Hook, PopulationPersistenceHook,
+    PreCommitHook, PostCommitHook
+)
 from .errors import (
     POPULATION_COMMIT_EXIST, POPUPLATION_BRANCH_EXISTS,
     POPULATION_PLAYER_NOT_EXIST
@@ -18,8 +22,8 @@ class Player:
     """
     def __init__(
         self,
+        parent: 'Player',
         name: str = None,
-        parent: 'Player' = None,
         parameters: Dict[str, Any] = None,
         hyperparameters: Dict[str, Any] = None,
         interaction: 'Interaction' = None,
@@ -70,6 +74,7 @@ class Player:
         """
         self.name = name
         self.parent = parent
+        self.path: str = ''
         self.descendants: List[Player] = []
 
         self.parameters = parameters
@@ -131,6 +136,7 @@ class Player:
         # Create child node
         descendant = Player(
             name=name,
+            parent=self,
             parameters=parameters,
             hyperparameters=hyperparameters,
             interaction=interaction,
@@ -203,8 +209,11 @@ class Population:
     def __init__(
         self,
         root_name: str = "_root",
+        stage_dir: str = None,
         pre_commit_hooks: List[PreCommitHook] = [],
-        post_commit_hooks: List[PostCommitHook] = []
+        post_commit_hooks: List[PostCommitHook] = [],
+        save_hooks: List[Hook] = [],
+        load_hooks: List[Hook] = [],
     ):
         """Instantiates population of players.
 
@@ -218,7 +227,12 @@ class Population:
         but rather create a branch for every new agent.
         """
 
-        self._root = Player(name=root_name, branch=root_name)
+        self._root = Player(
+            parent=None, name=root_name, branch=root_name)
+        if stage_dir:
+            self._stage_dir = os.path.join(stage_dir, '.pop/')
+        else:
+            self._stage_dir = stage_dir
 
         # A dictionary containing all commits in the tree
         # Multiple keys may refer to the same commit. In particular, branches
@@ -238,6 +252,12 @@ class Population:
         self._default_post_commit_hooks = [
 
         ] + post_commit_hooks
+        self._default_save_hooks = [
+            PopulationPersistenceHook()
+        ] + save_hooks
+        self._default_load_hooks = [
+
+        ] + load_hooks
 
     def _add_gen(self, player: Player):
         if len(self._generations) <= player.generation:
@@ -294,6 +314,7 @@ class Population:
 
         if next_player.name in self._nodes.keys():
             raise ValueError(POPULATION_COMMIT_EXIST.format(name))
+
         self._nodes[next_player.name] = next_player
 
         self._add_gen(next_player)
@@ -337,23 +358,25 @@ class Population:
     def save(
         self,
         path: str,
-        save_hooks: List[Hook] = []
+        hooks: List[Hook] = []
     ):
         """
             Save the state of the population
         """
         # TODO:
+
         raise NotImplementedError()
 
     def load(
         self,
         path: str,
-        load_hooks: List[Hook] = []
+        hooks: List[Hook] = []
     ):
         """
             Load the state of the population
         """
         # TODO:
+        
         raise NotImplementedError()
 
     def checkout(self, name: str) -> None:
@@ -485,3 +508,6 @@ class Population:
 
         self._nodes.update(nodes_to_add)
         self._branches = self._branches.union(branches_to_add)
+
+    def stage(self):
+        return self._stage_dir

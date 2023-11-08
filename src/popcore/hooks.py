@@ -60,10 +60,20 @@ class AutoIdHook(PreCommitHook):
         if player.name is not None:
             return player.name
 
-        node = population._player
-        path = ''
-        while node is not None:
-            path += str(node)
-            node = node.parent
+        parent = player.parent
+        player.name = sha1(parent.path.encode()).hexdigest()
+        player.path = f"{parent.path}/{player.name}"
 
-        player.name = sha1(path.encode()).hexdigest()
+
+class PopulationPersistenceHook(Hook):
+
+    def __init__(self) -> None:
+        super().__init__()
+
+    def __call__(self, population: 'core.Population') -> Any:
+        raise NotImplementedError()
+
+
+class ShallowPlayerPersistenceHook(Hook):
+    def __init__(self) -> None:
+        super().__init__()

@@ -167,7 +167,7 @@ def wandb_track(args):
         )
 
 
-def anneal(args, update, num_updates, lr):
+def anneal(args, update, num_updates):
     if args.anneal_lr:
         frac = 1.0 - (update - 1.0) / num_updates
         lrnow = frac * args.learning_rate
@@ -272,6 +272,7 @@ if __name__ == "__main__":
         ]
     )
     opponent_player = Player(
+        parent=None,
         name=args.env_id
     )
     for update in range(1, num_updates + 1):
@@ -335,7 +336,7 @@ if __name__ == "__main__":
                                    args.clip_coef).float().mean().item()]
 
                 mb_advantages = b_advantages[mb_inds]
-                mb_advantages = norm_adv()
+                mb_advantages = norm_adv(args, mb_advantages)
 
                 # Policy loss
                 pg_loss1 = -mb_advantages * ratio
