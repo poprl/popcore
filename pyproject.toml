@@ -21,6 +21,7 @@ dependencies = []
 
 [project.optional-dependencies]
 dev = [
+    "-e .",
     "networkx",
     "matplotlib",
     "pydot",
