@@ -160,7 +160,7 @@ class TestPopulation(unittest.TestCase):
         # draw(pop)
         # draw(pop2)
 
-        pop.attach(pop2, auto_rehash=False)
+        pop.attach(pop2)
 
         self.assertEqual(len(pop.branches()), 8)
         self.assertEqual(len(pop._nodes), 22)

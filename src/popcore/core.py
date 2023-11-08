@@ -226,10 +226,10 @@ class Population:
         directly to this branch if they want to track multiple separate agents,
         but rather create a branch for every new agent.
         """
-       
+
         self._root = Player(
             parent=None, name=root_name, branch=root_name)
-        
+
         if stage_dir:
             self._stage_dir = os.path.join(stage_dir, '.pop/')
         else:
@@ -247,7 +247,7 @@ class Population:
         self._branch: str = root_name
 
         self._branches: Set[str] = set([root_name])
-        
+
         # Pre-Commit Hooks
         self._default_pre_commit_hooks = [AutoIdHook()]
         if pre_commit_hooks:
@@ -387,7 +387,7 @@ class Population:
             Load the state of the population
         """
         # TODO:
-        
+
         raise NotImplementedError()
 
     def checkout(self, name: str) -> None:
@@ -486,7 +486,7 @@ class Population:
         if hooks is None:
             hooks = []
         if auto_rehash:
-            hooks.append(ReIdHook())
+            hooks.insert(0, ReIdHook())
 
         # Warning: If a model is saved in a detached pop, and the pop is then
         # reattached, the re-hashing of the commits might make the model not

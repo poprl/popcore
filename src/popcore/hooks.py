@@ -79,7 +79,8 @@ class AutoIdHook(PreCommitHook):
             return player.name
 
         parent = player.parent
-        player.name = sha1(parent.path.encode()).hexdigest()
+        path = parent.path + str(id(player))  # Avoid conflicts with siblings
+        player.name = sha1(path.encode()).hexdigest()
         player.path = f"{parent.path}/{player.name}"
 
 

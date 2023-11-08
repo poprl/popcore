@@ -679,7 +679,7 @@ class TestPopulationPPO(unittest.TestCase):
 
             agents_params.append(param)
             hyperparams.append(hyperparameters)
-            pop.current_node.hyperparameters["log"] = False
+            pop._player.hyperparameters["log"] = False
             hyperparameters = new_hyperparameters
 
         log_f.close()
@@ -695,24 +695,24 @@ class TestPopulationPPO(unittest.TestCase):
 
         # Assert that the models were properly saved
 
-        node = pop.nodes["_root"]
+        node = pop._nodes["_root"]
         i = -1
-        while node.has_child():
+        while node.has_descendants():
 
-            self.assertEqual(len(node.children), 1)
+            self.assertEqual(len(node.descendants), 1)
 
             if i > -1:
                 self.assertEqual(
                     agents_params[i],
-                    pop.nodes[node.id_str].model_parameters)
+                    pop._nodes[node.name].parameters)
             else:
-                self.assertIsNone(node.model_parameters)
+                self.assertIsNone(node.parameters)
 
             if node.hyperparameters is None:
                 self.assertIsNone(hyperparams[i+1])
             else:
                 self.assertDictEqual(node.hyperparameters, hyperparams[i+1])
-            node = node.children[0]
+            node = node.descendants[0]
             i += 1
 
         self.assertEqual(i+1, steps)
