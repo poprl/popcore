@@ -494,7 +494,7 @@ class Population:
         # is provided ot auto_rehash is true)
 
         # TODO: Fix me
-        if population._root.name not in self._nodes.keys():
+        if population._root.name not in self._nodes:
             raise ValueError(POPULATION_PLAYER_NOT_EXIST.format(
                 population._root.name))
 
@@ -530,7 +530,7 @@ class Population:
             for hook in hooks:
                 hook(self, player)
 
-            if name in self._nodes.keys():
+            if name in self._nodes:
                 raise ValueError(POPULATION_COMMIT_EXIST.format(name))
 
             # Add player to the index
