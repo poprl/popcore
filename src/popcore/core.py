@@ -212,8 +212,8 @@ class Population:
         stage_dir: str = None,
         pre_commit_hooks: List[PreCommitHook] | None = None,
         post_commit_hooks: List[PostCommitHook] | None = None,
-        save_hooks: List[Hook] = [],
-        load_hooks: List[Hook] = [],
+        save_hooks: List[Hook] | None = None,
+        load_hooks: List[Hook] | None = None,
     ):
         """Instantiates population of players.
 
@@ -226,11 +226,7 @@ class Population:
         directly to this branch if they want to track multiple separate agents,
         but rather create a branch for every new agent.
         """
-        if pre_commit_hooks is None:
-            pre_commit_hooks = []
-        if post_commit_hooks is None:
-            post_commit_hooks = []
-
+       
         self._root = Player(
             parent=None, name=root_name, branch=root_name)
         
@@ -251,18 +247,23 @@ class Population:
         self._branch: str = root_name
 
         self._branches: Set[str] = set([root_name])
-        self._default_pre_commit_hooks = [
-            AutoIdHook()
-        ] + pre_commit_hooks
-        self._default_post_commit_hooks = [
-
-        ] + post_commit_hooks
-        self._default_save_hooks = [
-
-        ] + save_hooks
-        self._default_load_hooks = [
-
-        ] + load_hooks
+        
+        # Pre-Commit Hooks
+        self._default_pre_commit_hooks = [AutoIdHook()]
+        if pre_commit_hooks:
+            self._default_pre_commit_hooks += pre_commit_hooks
+        # Post-Commit Hooks
+        self._default_post_commit_hooks = []
+        if post_commit_hooks:
+            self._default_post_commit_hooks += post_commit_hooks
+        # On Save Hooks
+        self._default_save_hooks = []
+        if save_hooks:
+            self._default_save_hooks += save_hooks
+        # On Load Hooks
+        self._default_load_hooks = []
+        if load_hooks:
+            self._default_load_hooks += load_hooks
 
     def _add_gen(self, player: Player):
         if len(self._generations) <= player.generation:
