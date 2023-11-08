@@ -107,7 +107,7 @@ def make_env(env_id, seed, idx, capture_video, run_name):
         else:
             env = gym.make(env_id)
         env = gym.wrappers.RecordEpisodeStatistics(env)
-        #env.seed(seed)
+        env.seed(seed)
         env.action_space.seed(seed)
         env.observation_space.seed(seed)
         return env
@@ -207,6 +207,13 @@ def bootstrap(agent, next_obs, rewards, device,
         returns = advantages + values
 
     return advantages, returns, values
+
+
+def norm_adv(args, mb_advantages):
+    if args.norm_adv:
+        return (mb_advantages - mb_advantages.mean()) / \
+            (mb_advantages.std() + 1e-8)
+    return mb_advantages
 
 
 if __name__ == "__main__":
@@ -328,9 +335,7 @@ if __name__ == "__main__":
                                    args.clip_coef).float().mean().item()]
 
                 mb_advantages = b_advantages[mb_inds]
-                if args.norm_adv:
-                    mb_advantages = (mb_advantages - mb_advantages.mean()) / \
-                        (mb_advantages.std() + 1e-8)
+                mb_advantages = norm_adv()
 
                 # Policy loss
                 pg_loss1 = -mb_advantages * ratio
