@@ -97,8 +97,17 @@ def _get_descendents(population: Population, name: str = None) -> List[str]:
 
 def lineage(
         population: Population, branch: str = None) -> Iterator[Player]:
-    """Returns an iterator with the commits in the given lineage"""
-    # TODO: Document the parameters
+    """Returns an iterator with the commits in the given lineage (branch)
+
+    Args:
+        population (Population): The population to iterate over.
+
+        branch (str): The name of the branch to iterate over. If None,
+            iterate over the current branch. Defaults to None
+
+    Returns:
+        Iterator[Player]: An iterator over all commits in the given branch"""
+
     lineage = _get_ancesters(population, branch)[:-1]
     for player in _get_players(population, lineage):
         yield player
@@ -106,16 +115,33 @@ def lineage(
 
 def generation(
         population: Population, generation: int = -1) -> Iterator[Player]:
-    """Returns an iterator with the players in the given generation"""
-    # TODO: Document the parameters
+    """Returns an iterator with the players in the given generation
+
+    Args:
+        population (Population): The population to iterate over.
+
+        gen (int): The generation to iterate over. Defaults to -1 (meaning the
+            last generation).
+
+    Returns:
+        Iterator[Player]: An iterator over all commits in the given generation
+    """
+
     for player in population._generations[generation]:
         yield player
 
 
 def flatten(
         population: Population) -> Iterator[Player]:
-    """Returns an iterator with all the players in the population"""
-    # TODO: Document the parameters
+    """Returns an iterator with all the players in the population
+
+    Args:
+        population (Population): The population to iterate over.
+
+    Returns:
+        Iterator[Player]: An iterator over all commits in the given population
+    """
+
     lineage = _get_descendents(population, population._root.name)[1:]
     for player in _get_players(population, lineage):
         yield player
