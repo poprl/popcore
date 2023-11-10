@@ -212,6 +212,7 @@ class Population:
         stage_dir: str = None,
         pre_commit_hooks: List[PreCommitHook] | None = None,
         post_commit_hooks: List[PostCommitHook] | None = None,
+        attach_hooks: List[AttachHook] | None = None,
         save_hooks: List[Hook] | None = None,
         load_hooks: List[Hook] | None = None,
     ):
@@ -262,6 +263,10 @@ class Population:
         self._default_post_commit_hooks = []
         if post_commit_hooks:
             self._default_post_commit_hooks += post_commit_hooks
+        # Attach Hooks
+        self._default_attach_hooks = [ReIdHook()]
+        if attach_hooks:
+            self._default_attach_hooks += attach_hooks
         # On Save Hooks
         self._default_save_hooks = []
         if save_hooks:
@@ -434,7 +439,10 @@ class Population:
         detached_pop = Population(
             root_name=self._player.name,
             pre_commit_hooks=self._default_pre_commit_hooks,
-            post_commit_hooks=self._default_post_commit_hooks)
+            post_commit_hooks=self._default_post_commit_hooks,
+            attach_hooks=self._default_attach_hooks,
+            save_hooks=self._default_save_hooks,
+            load_hooks=self._default_load_hooks)
         return detached_pop
 
     def _rename_conflicting_branches(self, population: 'Population'):
@@ -457,8 +465,7 @@ class Population:
         return branches_to_add, branch_renaming
 
     def attach(self, population: 'Population',
-               hooks: List[AttachHook] | None = None,
-               auto_rehash: bool = True) -> None:
+               attach_hooks: List[AttachHook] | None = None) -> None:
         """Merges back a previously detached population.
 
         Colliding branch names will have a number appended to fix the
@@ -489,15 +496,12 @@ class Population:
             ValueError: If there is a collision between commit id_str.
         """
 
-        if hooks is None:
-            hooks = []
-        if auto_rehash:
-            hooks.insert(0, ReIdHook())
+        # TODO Warning: If a model is saved in a detached pop, and the pop is
+        # then reattached, the re-hashing of the commits might make the model
+        # not loadable anymore since the name changed
 
-        # Warning: If a model is saved in a detached pop, and the pop is then
-        # reattached, the re-hashing of the commits might make the model not
-        # loadable anymore since the id_str changed (so in case either hooks
-        # is provided or auto_rehash is true)
+        if attach_hooks is None:
+            attach_hooks = []
 
         if population._root.name not in self._nodes:
             raise ValueError(POPULATION_PLAYER_NOT_EXIST.format(
@@ -534,7 +538,9 @@ class Population:
             player.generation += node.generation
 
             # Apply hooks
-            for hook in hooks:
+            for hook in chain(
+                self._default_pre_commit_hooks, attach_hooks
+            ):
                 hook(self, player)
 
             if name in self._nodes:
