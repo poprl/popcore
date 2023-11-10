@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "popcore"
-version = "1.0.0"
+version = "1.0.1"
 authors = [
     {name = "Aurélien Bück-Kaeffer", email = "aurelien.buck.kaeffer@gmail.com"},
     {name = "Manfred Diaz"}

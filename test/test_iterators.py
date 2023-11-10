@@ -1,38 +1,15 @@
 import unittest
-from popcore.core import Population
 from popcore.iterators import lineage, generation, flatten
-import random
+from .situations import (random_linear_dna_evolution, nonlinear_population,
+                         detach_from_pop)
 
 
 class TestIterators(unittest.TestCase):
 
-    def mutate(parent_parameters, hyperparameters, contributors=[]):
-        """Mutate a strand of DNA (replace a character in the str at random)"""
-        new_DNA = list(parent_parameters)
-        new_DNA[hyperparameters["spot"]] = hyperparameters["letter"]
-        new_DNA = ''.join(new_DNA)
-        return new_DNA, hyperparameters
-
     def test_linear(self):
         """This tests the correctness of the case where the population consists
         of only a single lineage"""
-        pop = Population()
-
-        new_DNA = "OOOOO"
-        DNA_history = [new_DNA]
-
-        pop.commit(parameters=new_DNA)
-
-        for x in range(16):
-            letter = random.choice("ACGT")
-            spot = random.randrange(len(new_DNA))
-
-            hyperparameters = {"letter": letter, "spot": spot}
-            new_DNA, _ = TestIterators.mutate(new_DNA,
-                                              hyperparameters)
-            DNA_history.append(new_DNA)
-
-            pop.commit(parameters=new_DNA, hyperparameters=hyperparameters)
+        pop, _ = random_linear_dna_evolution()
 
         # Test lineage
         self.assertEqual(len([x for x in lineage(pop)]), 17)
@@ -55,25 +32,7 @@ class TestIterators(unittest.TestCase):
     def test_nonlinear(self):
         """This tests the case where the population has multiple branches at
         different generations"""
-        pop = Population()
-        pop.branch("b1")
-        pop.checkout("b1")
-        pop.commit("1")
-        pop.branch("b2")
-        pop.checkout("b2")
-        pop.commit("2")
-        pop.commit("3")
-        pop.checkout("_root")
-        pop.branch("b3")
-        pop.checkout("b3")
-        pop.commit("4")
-        pop.checkout("b1")
-        pop.commit("5")
-
-        # from popcore.utils import draw
-        # draw(pop)
-
-        pop.checkout('b2')
+        pop = nonlinear_population()
 
         # lineage
         self.assertEqual(len([x for x in lineage(pop)]), 3)
@@ -91,40 +50,7 @@ class TestIterators(unittest.TestCase):
 
     def test_detach(self):
         """This tests the correctness of the detach/attach operations"""
-        pop = Population()
-        pop.branch("b1")
-        pop.branch("b2")
-        pop.checkout("b1")
-        a = pop.commit(1)
-        pop.commit(2)
-        pop.checkout(a)
-        pop.commit(3)
-        pop.checkout("_root")
-        pop.branch("b3")
-        pop.checkout('b2')
-        pop.commit(4)
-        pop.commit(5)
-        pop.commit(6)
-        pop.branch("b4")
-        pop.commit(7)
-        pop.checkout("b4")
-        pop.commit(8)
-        pop.checkout("b3")
-        a = pop.commit(9)
-        pop.commit(15)
-        pop.checkout(a)
-
-        pop2 = pop.detach()
-        pop2.branch("b1")
-        pop2.checkout("b1")
-        pop2.commit(10)
-        pop2.commit(11)
-        pop2.branch("b3")
-        pop2.commit(12)
-        pop2.checkout("b3")
-        pop2.commit(13)
-        pop2.checkout(pop2._root.name)
-        pop2.commit(14)
+        pop, pop2, _, _, _, _ = detach_from_pop()
 
         # lineage
         self.assertEqual(len([x for x in lineage(pop2)]), 1)
