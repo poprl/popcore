@@ -168,7 +168,7 @@ class Interaction(Generic[OUTCOME]):
         self,
         players: List[Player],
         outcomes: List[OUTCOME],
-        timestep: int
+        timestep: int = 0
     ):
         """_summary_
 
