@@ -1,9 +1,9 @@
 
-from typing import Any
+from typing import Any, Dict
 import os
 import torch
 
-from popcore import Player, Population
+from popcore import Player, Population, Interaction
 from popcore.hooks import PostCommitHook
 
 
@@ -11,24 +11,26 @@ class PersitenceHook(PostCommitHook):
 
     def __init__(
         self,
-        outdir: str
+        save_every: int
     ) -> None:
         super().__init__()
-        self._outdir = outdir
-        os.makedirs(outdir, exist_ok=True)
+        self._save_every = save_every
 
     def _post(
         self, population: Population, player: Player,
-        *args: Any, **kwds: Any
+        interaction: Interaction, timestep: int, parameters: Dict[str, Any]
     ):
         """
             Save Agent and Optimizer state
         """
-        torch.save(
-            {
-                'agent': player.parameters['agent'].state_dict(),
-                'optimizer': player.parameters['optimizer'].state_dict()
-            },
-            os.path.join(self._outdir, player.name)
-        )
+        if timestep % self._save_every == 0:
+            path = os.path.join(population.stage(), player.name)
+            torch.save(
+                {
+                    'agent': parameters['agent'].state_dict(),
+                    'optimizer': parameters['optimizer'].state_dict()
+                },
+                path
+            )
+            player.persisted = path
         return player

@@ -25,7 +25,7 @@ class TestBranch(unittest.TestCase):
         self.assertEqual(pop._nodes["_root"], pop._root)
         self.assertEqual(pop._nodes["_root"], pop._player)
         self.assertEqual(pop._player.name, "_root")
-        self.assertIsNone(pop._stage_dir)
+        self.assertIsNone(pop._stage)
         self.assert_invariants(pop)
 
     def test_with_root_name(self):
@@ -34,16 +34,16 @@ class TestBranch(unittest.TestCase):
         self.assertEqual(pop._nodes["root beer"], pop._root)
         self.assertEqual(pop._nodes["root beer"], pop._player)
         self.assertEqual(pop._player.name, "root beer")
-        self.assertIsNone(pop._stage_dir)
+        self.assertIsNone(pop._stage)
         self.assert_invariants(pop)
 
     def test_with_stage_dir(self):
-        pop = Population(stage_dir="here")
+        pop = Population(stage="here")
 
         self.assertEqual(pop._nodes["_root"], pop._root)
         self.assertEqual(pop._nodes["_root"], pop._player)
         self.assertEqual(pop._player.name, "_root")
-        self.assertEqual(pop._stage_dir, "here/.pop/")
+        self.assertEqual(pop._stage, "here/.pop/")
         self.assert_invariants(pop)
 
     def test_pre_commit_hooks(self):

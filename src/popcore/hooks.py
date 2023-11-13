@@ -98,17 +98,3 @@ class ReIdHook(AttachHook):
         while node is not None:
             path += str(node)
             node = node.parent
-
-
-class PopulationPersistenceHook(Hook):
-
-    def __init__(self) -> None:
-        super().__init__()
-
-    def __call__(self, population: 'core.Population') -> Any:
-        raise NotImplementedError()
-
-
-class ShallowPlayerPersistenceHook(Hook):
-    def __init__(self) -> None:
-        super().__init__()

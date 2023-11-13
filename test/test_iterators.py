@@ -1,6 +1,6 @@
 import unittest
 from popcore.iterators import lineage, generation, flatten
-from .situations import (random_linear_dna_evolution, nonlinear_population,
+from .fixtures import (random_linear_dna_evolution, nonlinear_population,
                          detach_from_pop)
 
 

@@ -152,48 +152,6 @@ if __name__ == "__main__":
         )
 
 
-def anneal(args, update, num_updates):
-    if args.anneal_lr:
-        frac = 1.0 - (update - 1.0) / num_updates
-        lrnow = frac * args.learning_rate
-        return lrnow
-    return args.learning_rate
-
-
-def chart(info, global_step, writer):
-    for item in info:
-        if "episode" in item.keys():
-            print(f"global_step={global_step}, "
-                  f"episodic_return={item['episode']['r']}")
-            writer.add_scalar("charts/episodic_return",
-                              item["episode"]["r"], global_step)
-            writer.add_scalar("charts/episodic_length",
-                              item["episode"]["l"], global_step)
-            break
-
-
-def bootstrap(agent, next_obs, rewards, device,
-              args, next_done, dones, values):
-    with torch.no_grad():
-        next_value = agent.get_value(next_obs).reshape(1, -1)
-        advantages = torch.zeros_like(rewards).to(device)
-        lastgaelam = 0
-        for t in reversed(range(args.num_steps)):
-            if t == args.num_steps - 1:
-                nextnonterminal = 1.0 - next_done
-                nextvalues = next_value
-            else:
-                nextnonterminal = 1.0 - dones[t + 1]
-                nextvalues = values[t + 1]
-            delta = rewards[t] + args.gamma * nextvalues * \
-                nextnonterminal - values[t]
-            advantages[t] = lastgaelam = delta + args.gamma * \
-                args.gae_lambda * nextnonterminal * lastgaelam
-        returns = advantages + values
-
-    return advantages, returns, values
-
-
 def norm_adv(args, mb_advantages):
     if args.norm_adv:
         return (mb_advantages - mb_advantages.mean()) / \
@@ -244,9 +202,8 @@ if __name__ == "__main__":
     num_updates = args.total_timesteps // args.batch_size
 
     population = Population(
-        post_commit_hooks=[
-            PersitenceHook(f"runs/{run_name}/agents/")
-        ]
+        stage=f"runs/{run_name}",
+        post_commit_hooks=[PersitenceHook()]
     )
     opponent_player = Player(
         parent=None,
@@ -361,20 +318,20 @@ if __name__ == "__main__":
                 if approx_kl > args.target_kl:
                     break
 
-        if global_step % args.save_every == 0:
-            mean_return = torch.mean(b_returns)
-            population.commit(
-                parameters={
-                    'agent': agent,
-                    'optimizer': optimizer
-                },
-                hyperparameters={key: value for key, value in vars(args).items()},
-                interaction=Interaction[float](
-                    players=[None, opponent_player],
-                    outcomes=[mean_return, -mean_return]
-                ),
-                timestep=global_step
-            )
+        mean_return = torch.mean(b_returns)
+        population.commit(
+            interaction=Interaction[float](
+                # the interaction between these two players
+                # created the new player
+                players=[population.head, opponent_player],
+                outcomes=[mean_return, -mean_return] # outcome of a zero-sum game
+            ),
+            timestep=update, # every update is an new player
+            parameters={  # extended parameters for the persitence hook
+                'agent': agent,
+                'optimizer': optimizer
+            }
+        )
         y_pred, y_true = b_values.cpu().numpy(), b_returns.cpu().numpy()
         var_y = np.var(y_true)
         explained_var = np.nan if var_y == 0 else 1 - np.var(y_true - y_pred) / var_y

@@ -2,7 +2,7 @@ import unittest
 from popcore.core import Population
 from popcore.iterators import lineage
 import random
-from .situations import (random_linear_dna_evolution, nonlinear_population,
+from .fixtures import (random_linear_dna_evolution, nonlinear_population,
                          detach_from_pop)
 
 
