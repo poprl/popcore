@@ -93,8 +93,21 @@ class ReIdHook(AttachHook):
         if player.name is not None:
             return player.name
 
+        # TODO: This seems incomplete
         node = player
         path = ''
         while node is not None:
             path += str(node)
             node = node.parent
+
+
+class StorageHook(PostCommitHook):
+
+    def __init__(self) -> None:
+        super().__init__()
+
+    def _post(
+        self, population: 'core.Population', player: 'core.Player',
+        *args: Any, **kwds: Any
+    ):
+        return super()._post(population, player, *args, **kwds)

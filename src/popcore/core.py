@@ -6,7 +6,10 @@ from itertools import chain
 
 from .hooks import (
     AutoIdHook, PreCommitHook, PostCommitHook, AttachHook,
-    ReIdHook
+    ReIdHook, StorageHook
+)
+from .storage import (
+    Index, MemoryIndex
 )
 from .errors import (
     POPULATION_COMMIT_EXIST, POPUPLATION_BRANCH_EXISTS,
@@ -196,14 +199,14 @@ class Interaction(Generic[OUTCOME]):
 class Population:
     """A data structure to manipulate evolving populations of agents.
     The structure is meant to be similar to that of a git repository, where
-    every branch corresponds to an agent."""
+    every commit corresponds to an agent."""
 
     def __init__(
         self,
-        stage: str = None,
         root: 'Optional[Player]' = None,
         root_name: str = "_root",
         root_branch: str = "main",
+        index: 'Optional[Index]' = None,
         pre_commit_hooks: Optional[List[PreCommitHook]] = None,
         post_commit_hooks: Optional[List[PostCommitHook]] = None,
         attach_hooks: Optional[List[AttachHook]] = None,
@@ -228,19 +231,20 @@ class Population:
         # Need to separate root.name and rootbranch otherwise if a commit is
         # made to _root, it updates the _root branch to point at the new commit
         # and we lose the access to the root commit.
-        self._stage = os.path.join(stage, '.pop') if stage else '.pop'
-        os.makedirs(self._stage, exist_ok=True)
-
         # A dictionary containing all commits in the tree
         # Multiple keys may refer to the same commit. In particular, branches
         # are aliases to specific commits
-        self._nodes: Dict[str, Player] = {
-            root_name: self._root,
-            root_branch: self._root
-        }
+        # self._nodes: Dict[str, Player] = {
+        #     root_name: self._root,
+        #     root_branch: self._root
+        # }
+
+        self._index = MemoryIndex() if not index else index
+        self._index.save(root_name, self._root)
+        self._index.save(root_branch, self._root)
 
         # An array of every node indexed by generation (1st gen has index 0)
-        self._generations: List[List[Player]] = [[]]
+        # self._generations: List[List[Player]] = [[]]
 
         self._player: Player = self._root
         self._branch: str = self._root.branch
@@ -253,7 +257,9 @@ class Population:
         ]
         self._pre_commit_hooks += pre_commit_hooks if pre_commit_hooks else []
         # Post-Commit Hooks
-        self._post_commit_hooks: List[PostCommitHook] = []
+        self._post_commit_hooks: List[PostCommitHook] = [
+            StorageHook()
+        ]
         self._post_commit_hooks += post_commit_hooks if post_commit_hooks else []
         # Attach Hooks
         self._attach_hooks: List[AttachHook] = [
@@ -307,15 +313,18 @@ class Population:
         ):
             hook(self, next_player, **kwargs)
 
-        if next_player.name in self._nodes:
+        if self._index.exists(next_player.name):
             raise ValueError(POPULATION_COMMIT_EXIST.format(name))
 
-        self._nodes[next_player.name] = next_player
+        # TODO: This should move to the persistence layer
+        self._index.save(next_player.name, next_player)
+        # self._nodes[next_player.name] = next_player
 
-        self._add_gen(next_player)
+        # self._add_gen(next_player)
 
         self._player = next_player
-        self._nodes[self._branch] = self._player
+        self._index.save(self._branch, self._player)
+        # self._nodes[self._branch] = self._player
 
         post_commit_hooks = post_commit_hooks if post_commit_hooks else []
         for hook in chain(
@@ -346,8 +355,8 @@ class Population:
         if name in self._nodes:
             raise ValueError(POPUPLATION_BRANCH_EXISTS.format(name))
 
-        self._nodes[name] = self._player
-        self._branches.add(name)
+        self._index.save(name, self._player)
+        self._branches.add(name)  # TODO: Branches should go to persistence
 
         return name
 
@@ -360,10 +369,10 @@ class Population:
         Raises:
             ValueError: If there is no branch with the specified name"""
 
-        if name not in self._nodes:
+        if not self._index.exists(name):
             raise ValueError(POPULATION_PLAYER_NOT_EXIST.format(name))
 
-        self._player = self._nodes[name]
+        self._player = self._index.load(name)
 
         if name in self._branches:
             self._branch = name
@@ -378,7 +387,6 @@ class Population:
 
     def detach(
         self,
-        stage: str
     ) -> 'Population':
         """Creates a Population with the current player as root.
 
@@ -392,7 +400,6 @@ class Population:
         """
         # TODO: detach persistence
         detached_pop = Population(
-            stage=stage,
             root=self._player,
             pre_commit_hooks=self._pre_commit_hooks,
             post_commit_hooks=self._post_commit_hooks,
@@ -496,9 +503,6 @@ class Population:
     def head(self) -> 'Player':
         return self._player
 
-    def stage(self) -> str:
-        return self._stage
-
     def _rename_conflicting_branches(self, population: 'Population'):
         """Every branch that generates a conflict gets renamed by adding an
         integer at the end"""
@@ -509,7 +513,7 @@ class Population:
         for branch in population._branches:
             new_branch = branch
             i = 1
-            while new_branch in self._nodes:
+            while self._index.exists(new_branch):
                 new_branch = branch + str(i)
                 i += 1
 
@@ -517,8 +521,3 @@ class Population:
             branch_renaming[branch] = new_branch
 
         return branches_to_add, branch_renaming
-
-    def _add_gen(self, player: Player):
-        if len(self._generations) <= player.generation:
-            self._generations.append([])
-        self._generations[player.generation].append(player)
