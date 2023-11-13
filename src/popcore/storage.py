@@ -1,8 +1,12 @@
+from __future__ import annotations
+
 from abc import ABC, abstractmethod
 from typing import List
 
-from popcore import Player
-from . import Population, Player
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from .core import Player
 
 
 class Index(ABC):
