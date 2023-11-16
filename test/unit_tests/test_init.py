@@ -1,5 +1,5 @@
 import unittest
-from popcore.core import Population
+from popcore.population import Population
 
 
 class TestBranch(unittest.TestCase):
