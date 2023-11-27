@@ -1,8 +1,7 @@
 
-from typing import Any, Dict
 import fsspec
 from .core import Serializer
-from .keyvalue import KeyValue
+from .keyvalue import Memory
 
 
 class BinaryFile:
@@ -22,14 +21,18 @@ class BinaryFileSerializer(Serializer[str, BinaryFile]):
         return super().deserialize(key_value_store)
 
 
-class BinaryFileStore(KeyValue[BinaryFile]):
+class BinaryFileStore(Memory[BinaryFile]):
     def __init__(
         self,
         path: str,
-        filesystem: str = 'file',
-        filesystem_options: Dict[str, Any] | None = None,
+        filesystem: fsspec.AbstractFileSystem,
     ) -> None:
-        self._fs: fsspec.AbstractFileSystem = fsspec.filesystem(
-            filesystem, storage_options=filesystem_options)
+        self._fs = filesystem
         self._fs.makedirs(path, exist_ok=True)
         super().__init__(serializer=BinaryFileSerializer(path, self._fs))
+        self.path = path
+
+    def _delete(self):
+        [self._fs.rm_file(v.path) for k, v in self._mem.items()]
+        self._fs.rmdir(self.path)
+        super()._delete()

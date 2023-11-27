@@ -4,7 +4,7 @@ import os
 import torch
 
 from popcore import Player, Population, Interaction
-from popcore.hooks import PostCommitHook
+from popcore.storage.hooks import PostCommitHook
 
 
 class PersitenceHook(PostCommitHook):
@@ -24,7 +24,7 @@ class PersitenceHook(PostCommitHook):
             Save Agent and Optimizer state
         """
         if timestep % self._save_every == 0:
-            path = os.path.join(population.stage(), player.name)
+            path = os.path.join(population.stage(), player.id)
             torch.save(
                 {
                     'agent': parameters['agent'].state_dict(),

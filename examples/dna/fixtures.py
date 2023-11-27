@@ -1,7 +1,7 @@
 # Create populations in different ways and for different situations to perform
 # tests on them
 
-from popcore.core import Population
+from popcore.population import Population
 import random
 
 
@@ -91,7 +91,7 @@ def detach_from_pop():
     pop2.commit(12)
     pop2.checkout("b3")
     pop2.commit(13)
-    pop2.checkout(pop2._root.name)
+    pop2.checkout(pop2._root.id)
     d = pop2.commit(14)
 
     return pop, pop2, a, b, c, d

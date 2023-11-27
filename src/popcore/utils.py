@@ -1,4 +1,4 @@
-from . import Population
+from .population import Population
 from .iterators import flatten
 
 
@@ -15,7 +15,7 @@ def draw(population: Population):
     graph.add_nodes_from(population._nodes.keys())
 
     for node in flatten(population):
-        graph.add_edge(node.name, node.parent.name)
+        graph.add_edge(node.id, node.parent.id)
 
     pos = graphviz_layout(graph, prog="dot")
     nx.draw_networkx(

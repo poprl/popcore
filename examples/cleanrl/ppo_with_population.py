@@ -16,8 +16,9 @@ from torch.distributions.categorical import Categorical
 from torch.utils.tensorboard import SummaryWriter
 
 from popcore import (
-    Population, Interaction, Player
+    Interaction, Player
 )
+from popcore.population import Population
 
 
 def parse_args():
@@ -207,7 +208,7 @@ if __name__ == "__main__":
     )
     opponent_player = Player(
         parent=None,
-        name=args.env_id
+        id=args.env_id
     )
     for update in range(1, num_updates + 1):
         # Annealing the rate if instructed to do so.

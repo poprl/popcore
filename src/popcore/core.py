@@ -1,5 +1,3 @@
-
-
 from typing import Generic, List, Optional, TypeVar
 
 
@@ -12,13 +10,12 @@ class Player:
     """
     def __init__(
         self,
-        name: Optional[str] = None,
+        id: Optional[str] = None,
         parent: 'Optional[Player]' = None,
         interaction: 'Optional[Interaction]' = None,
         generation: Optional[int] = 0,
         timestep: Optional[int] = 1,
         branch: Optional[str] = None,
-        persistence: Optional[str] = None
     ):
 
         """A specific version of an agent at a given point in time.
@@ -61,9 +58,8 @@ class Player:
                 tree.
             ValueError: If the id_str conflicts with an other node in the tree.
         """
-        self.name = name
+        self.id = id
         self.parent = parent
-        self.path: str = ''
         self.descendants: List[Player] = []
 
         self.interaction = interaction
@@ -72,14 +68,13 @@ class Player:
         self.timestep: int = timestep
 
         self.branch = branch
-        self.persistence = persistence
 
     def add_descendant(
         self,
-        name: str = None,
-        interaction: 'Interaction' = None,
-        timestep: int = 1,
-        branch: str = None
+        id: Optional[str] = None,
+        interaction: Optional['Interaction'] = None,
+        timestep: Optional[int] = 1,
+        branch: Optional[str] = None
     ) -> 'Player':
 
         """Adds a decendant to this node
@@ -118,7 +113,7 @@ class Player:
 
         # Create child node
         descendant = Player(
-            name=name,
+            id=id,
             parent=self,
             interaction=interaction,
             generation=self.generation + 1,
@@ -140,9 +135,9 @@ class Team(Player):
     """
     members: "list[Player]"
 
-    def __init__(self, name: str, members: "list[Player]"):
+    def __init__(self, id: str, members: "list[Player]"):
         self.members = members
-        super().__init__(name)
+        super().__init__(id)
 
 
 class Interaction(Generic[GameOutcome]):

@@ -1,18 +1,52 @@
-from dataclasses import dataclass
-import os
-from typing import Dict, List, Optional
-from itertools import chain
+from typing import Iterator, List, Optional, Set
+from hashlib import sha1
 
 from .errors import (
     POPULATION_COMMIT_EXIST, POPUPLATION_BRANCH_EXISTS,
     POPULATION_PLAYER_NOT_EXIST
 )
 from .core import Interaction, Player
-from .hooks import (
-    AutoIdHook, PreCommitHook, PostCommitHook, AttachHook,
-    ReIdHook, StorageHook
-)
-from .storage.repo import Repository
+from .storage.repo import Repository, Hook
+from .storage.core import Serializer
+
+
+class PlayerKeyValueSerializer(Serializer[Player, dict]):
+
+    def __init__(
+        self,
+        exclude_fields: List[str] = ['descendants']
+    ) -> None:
+        super().__init__()
+        self._exclude_fields = exclude_fields
+
+    def serialize(self, player: Player) -> dict:
+        fields = {
+            k: v for k, v in player.__dict__.items()
+            if k not in self._exclude_fields
+        }
+        fields['parent'] = player.parent.id if player.parent else None
+        return fields
+
+    def deserialize(self, key_value_store: dict) -> 'Player':
+        filtered = {
+            k: v for k, v in key_value_store.items()
+        }
+        return Player(**filtered)
+
+
+class PlayerAutoIdHook(Hook):
+
+    def __call__(
+        self, repo: Repository, player: Player,
+        *args, **kwds
+    ):
+        if player.id is not None:
+            return player.id
+
+        parent = player.parent
+        path = parent.id + str(id(player))  # Avoid conflicts with siblings
+        player.id = sha1(path.encode()).hexdigest()
+        # player.path = f"{parent.path}/{player.id}"
 
 
 class Population:
@@ -25,10 +59,7 @@ class Population:
         root: 'Optional[Player]' = None,
         root_name: str = "_root",
         root_branch: str = "main",
-        store: 'Optional[Repository]' = None,
-        pre_commit_hooks: Optional[List[PreCommitHook]] = None,
-        post_commit_hooks: Optional[List[PostCommitHook]] = None,
-        attach_hooks: Optional[List[AttachHook]] = None,
+        stage: 'Optional[Repository[Player]]' = '.popcache',
     ):
         """Instantiates population of players.
 
@@ -43,23 +74,17 @@ class Population:
         """
 
         root = root if root else Player(
-            parent=None, name=root_name, branch=root_branch
+            parent=None, id=root_name, branch=root_branch
         )
         self._root = root
 
-        # Need to separate root.name and rootbranch otherwise if a commit is
-        # made to _root, it updates the _root branch to point at the new commit
-        # and we lose the access to the root commit.
-        # A dictionary containing all commits in the tree
-        # Multiple keys may refer to the same commit. In particular, branches
-        # are aliases to specific commits
-        # self._nodes: Dict[str, Player] = {
-        #     root_name: self._root,
-        #     root_branch: self._root
-        # }
+        self.repo = Repository[Player](
+            stage=stage,
+            pre_commit_hooks=[PlayerAutoIdHook()],
+            serializer=PlayerKeyValueSerializer()
+        )
 
-        self.repo = Repository() if not store else store
-        self.repo[root_name, self._root]
+        self.repo.commit(root_name, self._root)
         self.repo.branch(root_branch, self._root)
 
         # An array of every node indexed by generation (1st gen has index 0)
@@ -68,29 +93,11 @@ class Population:
         self._player: Player = self._root
         self._branch: str = self._root.branch
 
-        # Pre-Commit Hooks
-        self._pre_commit_hooks: List[PreCommitHook] = [
-            AutoIdHook()
-        ]
-        self._pre_commit_hooks += pre_commit_hooks if pre_commit_hooks else []
-        # Post-Commit Hooks
-        self._post_commit_hooks: List[PostCommitHook] = [
-            StorageHook()
-        ]
-        self._post_commit_hooks += post_commit_hooks if post_commit_hooks else []
-        # Attach Hooks
-        self._attach_hooks: List[AttachHook] = [
-            ReIdHook()
-        ]
-        self._attach_hooks += attach_hooks if attach_hooks else []
-
     def commit(
         self,
-        name: str = None,
+        id: str = None,
         interaction: "Interaction | None" = None,
         timestep: int = 1,
-        pre_commit_hooks: List[PreCommitHook] | None = None,
-        post_commit_hooks: List[PostCommitHook] | None = None,
         **kwargs
     ) -> str:
         """Creates a new commit in the current branch.
@@ -115,36 +122,25 @@ class Population:
         Returns:
             str: The id_str of the new commit.
         """
-
+        if self.repo.exists(id):
+            raise ValueError(POPULATION_COMMIT_EXIST.format(id))
         # Create the child node
         next_player = self._player.add_descendant(
-            name=name,
+            id=id,
             interaction=interaction,
             timestep=timestep,
             branch=self._branch
         )
 
-        pre_commit_hooks = pre_commit_hooks if pre_commit_hooks else []
-        for hook in chain(
-            self._pre_commit_hooks, pre_commit_hooks
-        ):
-            hook(self, next_player, **kwargs)
+        if self.repo.exists(next_player.id):
+            raise ValueError(POPULATION_COMMIT_EXIST.format(id))
 
-        if self.repo.verify(next_player.name):
-            raise ValueError(POPULATION_COMMIT_EXIST.format(name))
-
-        self.repo.commit(next_player.name, next_player)
-        self.repo.branch(self._branch, self._player)
-
-        post_commit_hooks = post_commit_hooks if post_commit_hooks else []
-        for hook in chain(
-            self._post_commit_hooks, post_commit_hooks
-        ):
-            hook(self, next_player, **kwargs)
+        self.repo.commit(next_player.id, next_player)
+        self.repo.branch(self._branch, next_player)
 
         self._player = next_player
 
-        return next_player.name
+        return next_player.id
 
     def branch(self, name: str = None) -> str:
         """Create a new branch diverging from the current branch.
@@ -164,12 +160,12 @@ class Population:
         if name is None:
             return self._branch
 
-        if name in self.repo:
+        if self.repo.exists(name):
             raise ValueError(POPUPLATION_BRANCH_EXISTS.format(name))
 
         self.repo.branch(name, self._player)
 
-        return name
+        return self.checkout(name)
 
     def checkout(self, name: str) -> str:
         """Set the current branch to the one specified.
@@ -180,21 +176,26 @@ class Population:
         Raises:
             ValueError: If there is no branch with the specified name"""
 
-        if name not in self.repo:
+        if not self.repo.exists(name):
             raise ValueError(POPULATION_PLAYER_NOT_EXIST.format(name))
 
-        self._player: Player = self.repo[name]
-
-        if name in self._branches:
+        if name in self.repo._branches:
             self._branch = name
+            self._player: Player = self.repo.commit(
+                self.repo.branch(name)
+            )
         else:
+            self._player: Player = self.repo.commit(name, None)
             self._branch = self._player.branch
 
         return self._branch
 
     def branches(self) -> Set[str]:
         """Returns a set of all branches"""
-        return self._branches
+        return set(self.repo._branches)
+
+    def head(self) -> 'Player':
+        return self._player
 
     def detach(
         self,
@@ -218,10 +219,21 @@ class Population:
         )
         return detached_pop
 
+    def delete(self):
+        self.repo.delete()
+        self._player = None
+        self._branch = None
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exctype, excinst, exctb) -> bool:
+        self.delete()
+        return False
+
     def attach(
         self,
         population: 'Population',
-        attach_hooks: Optional[List[AttachHook]] = None
     ) -> None:
         """Merges back a previously detached population.
 
@@ -258,12 +270,12 @@ class Population:
         # not loadable anymore since the name changed
 
         # TODO: attach persistence
-        if population._root.name not in self.repo:
+        if population._root.id not in self.repo:
             raise ValueError(POPULATION_PLAYER_NOT_EXIST.format(
-                population._root.name))
+                population._root.id))
 
         # Pick the right place to reattach
-        node: Player = self.repo[population._root.name]
+        node: Player = self.repo[population._root.id]
 
         # Transfer all the nodes from the other pop to the right place
         for player in population._root.descendants:
@@ -277,10 +289,9 @@ class Population:
             population
         )
 
-        attach_hooks = attach_hooks if attach_hooks else []
         for name, player in population.repo.items():
             # Ignore root node
-            if name == population._root.name:
+            if name == population._root.id:
                 continue
 
             # Add the renamed branches to the main pop
@@ -293,13 +304,15 @@ class Population:
 
             player.generation += node.generation
 
-            # Apply hooks
-            for hook in chain(
-                self._attach_hooks, attach_hooks
-            ):
-                hook(self, player)
+            if player.name is None:
+                # TODO: This seems incomplete
+                node = player
+                path = ''
+                while node is not None:
+                    path += str(node)
+                    node = node.parent
 
-            if name in self._nodes:
+            if name in self.repo:
                 raise ValueError(POPULATION_COMMIT_EXIST.format(name))
 
             # Add player to the index
@@ -311,8 +324,54 @@ class Population:
         self._nodes.update(nodes_to_add)
         self._branches = self._branches.union(branches_to_add)
 
-    def head(self) -> 'Player':
-        return self._player
+    def lineage(self, branch: str = None) -> Iterator[Player]:
+        """Returns an iterator with the commits in the given lineage (branch)
+
+        Args:
+            population (Population): The population to iterate over.
+
+            branch (str): The name of the branch to iterate over. If None,
+                iterate over the current branch. Defaults to None
+
+        Returns:
+            Iterator[Player]: An iterator over all commits in the given branch"""
+
+        lineage = self._get_ancesters(branch)[:-1]
+        for player in self._get_players(lineage):
+            yield player
+
+    def generation(self, generation: int = -1) -> Iterator[Player]:
+        """Returns an iterator with the players in the given generation
+
+        Args:
+            population (Population): The population to iterate over.
+
+            gen (int): The generation to iterate over. Defaults to -1 (meaning the
+                last generation).
+
+        Returns:
+            Iterator[Player]: An iterator over all commits in the given generation
+        """
+
+        raise NotImplementedError()
+
+    def flatten(self) -> Iterator[Player]:
+        """Returns an iterator with all the players in the population
+
+        Args:
+            population (Population): The population to iterate over.
+
+        Returns:
+            Iterator[Player]: An iterator over all commits in the given population
+        """
+
+        lineage = self._get_descendents(self._root.id)[1:]
+        for player in self._get_players(lineage):
+            yield player
+
+    @property
+    def stage(self):
+        return self.repo._stage
 
     def _rename_conflicting_branches(self, population: 'Population'):
         """Every branch that generates a conflict gets renamed by adding an
@@ -332,3 +391,92 @@ class Population:
             branch_renaming[branch] = new_branch
 
         return branches_to_add, branch_renaming
+
+    def _get_player(self, name: str = None) -> Player:
+        """Returns the commit with the given id_str if it exists.
+
+            Args:
+                name (str): The name of the commit we are trying to get. If
+                    id_str is the empty string, returns the latest commit of the
+                    current branch. Defaults to the empty string.
+
+            Raises:
+                ValueError: If a commit with the specified `name` does not exist"""
+
+        if name is None:
+            return self._player
+
+        if name not in self._objects:
+            raise ValueError(POPULATION_PLAYER_NOT_EXIST.format(name))
+
+        return self.repo.commit(name)
+
+    def _get_players(self, names: List[str]) -> List[Player]:
+        """Returns the commit with the given id_str if it exists.
+
+        Args:
+            id_strs (List[str]): The id_str of the commits we are trying to
+                get.
+
+        Raises:
+            KeyError: If a commit with one of the specified id_str does not
+                exist
+        """
+
+        return [self._get_player(name) for name in names]
+
+    def _get_ancesters(self, name: str = None) -> List[str]:
+        """Returns a list of all id_str of commits that came before the one
+        with specified id_str.
+
+        If id_str is not specified, it will return the commit history of the
+        latest commit of the current branch.
+        The list is of all commits that led to the specified commit. This
+        means that commits from sister branches will not be included even if
+        they may be more recent. However commits from ancestor branches would
+        be included, up to _root.
+
+        The list returned is in inverse chronological order, so the most
+        recent commit appears first, and the oldest last."""
+
+        player: None | Player  # Mypy cries if I don't specify that
+
+        if name is None:
+            player = self._player
+        else:
+            if not self.repo.exists(name):
+                raise ValueError(POPULATION_PLAYER_NOT_EXIST.format(name))
+            player = self.repo.commit(name)
+
+        history = [player.id]
+        player = player.parent
+        while player is not None:
+            history.append(player.id)
+            player = player.parent
+
+        return history
+
+    def _get_descendents(self, name: str = None) -> List[str]:
+        """Returns a list of all id_str of commits that came after the one
+        with specified id_str, including branches.
+
+        If id_str is not specified, it will default to the current commit.
+        The list is of all commits that originate from the specified commit.
+
+        The list returned is in no particular order."""
+
+        player: None | Player  # Mypy cries if I don't specify that
+
+        if name is None:
+            player = self._player
+        else:
+            if not self.repo.exists(name):
+                raise ValueError(POPULATION_PLAYER_NOT_EXIST.format(name))
+            player = self.repo.commit(name)
+
+        history = [player.id]
+        for player in player.descendants:
+            history.extend(self._get_descendents(player.id))
+
+        return history
+
