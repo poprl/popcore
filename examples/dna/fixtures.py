@@ -4,13 +4,15 @@
 from popcore.population import Population
 import random
 
+# TODO: @Szacquer document this example.
+
 
 def mutate(parent_parameters, hyperparameters, contributors=[]):
     """Mutate a strand of DNA (replace a character in the str at random)"""
-    new_DNA = list(parent_parameters)
-    new_DNA[hyperparameters["spot"]] = hyperparameters["letter"]
-    new_DNA = ''.join(new_DNA)
-    return new_DNA, hyperparameters
+    next_dna = list(parent_parameters)
+    next_dna[hyperparameters["spot"]] = hyperparameters["letter"]
+    next_dna = ''.join(next_dna)
+    return next_dna, hyperparameters
 
 
 def random_linear_dna_evolution():
@@ -18,22 +20,22 @@ def random_linear_dna_evolution():
     of only a single lineage"""
     pop = Population()
 
-    new_DNA = "OOOOO"
-    DNA_history = [new_DNA]
+    next_dna = "OOOOO"
+    dna_history = [next_dna]
 
-    pop.commit(parameters=new_DNA)
+    pop.commit(parameters=next_dna)
 
     for x in range(16):
         letter = random.choice("ACGT")
-        spot = random.randrange(len(new_DNA))
+        spot = random.randrange(len(next_dna))
 
         hyperparameters = {"letter": letter, "spot": spot}
-        new_DNA, _ = mutate(new_DNA, hyperparameters)
-        DNA_history.append(new_DNA)
+        next_dna, _ = mutate(next_dna, hyperparameters)
+        dna_history.append(next_dna)
 
-        pop.commit(parameters=new_DNA, hyperparameters=hyperparameters)
+        pop.commit(parameters=next_dna, hyperparameters=hyperparameters)
 
-    return pop, DNA_history
+    return pop, dna_history
 
 
 def nonlinear_population():
