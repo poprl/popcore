@@ -13,7 +13,7 @@ Metadata = TypeVar("Metadata")
 
 class Hook:
     """
-       Hook
+        Hook
     """
     @abstractmethod
     def __call__(self, repo: 'Repository', metadata: Metadata, **kwds):

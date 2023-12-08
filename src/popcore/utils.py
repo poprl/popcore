@@ -3,9 +3,9 @@ from .iterators import flatten
 
 
 def draw(population: Population):
-    """Displays the phylogenetic tree.
+    """Displays the population as a tree.
 
-    Only parental edges are shown, contributors are ignored."""
+    Only parental edges are shown."""
 
     import networkx as nx                              # type: ignore
     import matplotlib.pyplot as plt                         # type: ignore
