@@ -4,28 +4,34 @@
 from popcore.population import Population
 import random
 
-# TODO: @Szacquer document this example.
-
-
-def mutate(parent_parameters, hyperparameters, contributors=[]):
-    """Mutate a strand of DNA (replace a character in the str at random)"""
-    next_dna = list(parent_parameters)
-    next_dna[hyperparameters["spot"]] = hyperparameters["letter"]
-    next_dna = ''.join(next_dna)
-    return next_dna, hyperparameters
-
 
 def random_linear_dna_evolution():
-    """This tests the correctness of the case where the population consists
-    of only a single lineage"""
+    """Tracking the evolution of a strand of DNA
+
+    We look at a single strand of DNA, represented by a string, as it mutates
+    over time. We use a Population to store it's evolution.
+
+    Here, we only consider a single lineage and suppose that no speciation
+    happened."""
+
+    def mutate(parent_parameters, hyperparameters):
+        """Mutate a strand of DNA (replace a character in the str at random)"""
+        next_dna = list(parent_parameters)
+        next_dna[hyperparameters["spot"]] = hyperparameters["letter"]
+        next_dna = ''.join(next_dna)
+        return next_dna, hyperparameters
+
     pop = Population()
 
-    next_dna = "OOOOO"
+    # Initial DNA strand
+    next_dna = "AAAAA"
     dna_history = [next_dna]
 
+    # Commit the first DNA strand
     pop.commit(parameters=next_dna)
 
     for x in range(16):
+        # Mutate the DNA strand
         letter = random.choice("ACGT")
         spot = random.randrange(len(next_dna))
 
@@ -33,6 +39,7 @@ def random_linear_dna_evolution():
         next_dna, _ = mutate(next_dna, hyperparameters)
         dna_history.append(next_dna)
 
+        # Commit the new, mutated DNA strand to the population
         pop.commit(parameters=next_dna, hyperparameters=hyperparameters)
 
     return pop, dna_history
