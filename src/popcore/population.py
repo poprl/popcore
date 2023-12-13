@@ -188,10 +188,10 @@ class Population:
 
         :return: The name of the new commit
         :rtype: str
-        
+
         .. seealso::
             :meth:`popcore.Population.branches`
-            
+
             :meth:`popcore.Population.checkout`
         """
 
@@ -242,7 +242,7 @@ class Population:
 
         .. seealso::
             :meth:`popcore.Population.branch`
-            
+
             :meth:`popcore.Population.checkout`
         """
         return set(self.repo._branches)

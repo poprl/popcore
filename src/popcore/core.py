@@ -20,13 +20,6 @@ class Player:
         Defaults to 0.
     :param Optional[int] timestep: The timestep when this player was
         created. Defaults to 1.
-
-    .. seealso::
-        :class:`popcore.core.Team`
-
-        :class:`popcore.core.Interaction`
-
-        :class:`popcore.population.Population`
     """
 
     def __init__(
@@ -80,7 +73,7 @@ class Player:
         :rtype: Player
 
         .. seealso::
-            :meth:`popcore.core.Player.has_descendants`
+            :meth:`popcore.Player.has_descendants`
         """
 
         # TODO: Should this check the branch exists or create it otherwise?
@@ -105,7 +98,7 @@ class Player:
         """Returns True if the player has descendants
 
         .. seealso::
-            :meth:`popcore.core.Player.add_descendants`"""
+            :meth:`popcore.Player.add_descendant`"""
         return len(self.descendants) > 0
 
 
@@ -119,9 +112,9 @@ class Team(Player):
     :param list[Player] members: The players that constitute the team.
 
     .. seealso::
-        :class:`popcore.core.Player`
+        :class:`popcore.Player`
 
-        :class:`popcore.population.Population`
+        :class:`popcore.Population`
     """
     members: "list[Player]"
 
