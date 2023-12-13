@@ -6,8 +6,22 @@ GameOutcome = TypeVar("GameOutcome")
 
 class Player:
     """
-        Player
+    A specific version of an agent at a given point in time.
+
+    This is equivalent to a commit in the population.
+
+    :param str id: The id of the player to find it in the population.
+            ids must be unique within each population. Defaults to None.
+    :param Optional[Player] parent: The parent of this player.
+        If None, this is considered a root. Every player may only
+        have one parent. Defaults to None
+    :param Optional[Interaction] interaction: __description__
+    :param Optional[int] generation: The generation this player belongs to.
+        Defaults to 0.
+    :param Optional[int] timestep: The timestep when this player was
+        created. Defaults to 1.
     """
+
     def __init__(
         self,
         id: Optional[str] = None,
@@ -17,47 +31,7 @@ class Player:
         timestep: Optional[int] = 1,
         branch: Optional[str] = None,
     ):
-
-        """A specific version of an agent at a given point in time.
-
-        This is equivalent to a commit in the population.
-
-        Args: TODO
-            parent (Player | None): The parent of this player.
-                If None, this is considered a root. Every player may only
-                have one parent, but if it needs more, it can have
-                arbitrarily many contributors. Defaults to None
-            model_parameters (Any): The parameters of the model. With
-                neural networks, that would be the weights and biases.
-                Defaults to None.
-            id_str (str): The id_str of the player to find it in the pop.
-                id_strs must be unique within each pop. Defaults to the empty
-                string.
-            hyperparameters (Dict[str, Any]): A dictionary of the
-                hyperparameters that define the transition from the parent
-                to this player. This should contain enough information to
-                reproduce the evolution step deterministically given the
-                parent and contributors parameters.
-                Defaults to an empty dict.
-            contributors (List[PhylogeneticTree.Node]): All the models
-                other than the parent that contributed to the evolution.
-                Typically, that would be opponents and allies, or mates in
-                the case of genetic crossover.
-                For example, if the model played a game of chess against
-                an opponent and learned from it, the parent would be the
-                model before that game, and the contributor would be the
-                opponent. Defaults to an empty list.
-            generation (int): The generation this player belongs to.
-                Defaults to 1.
-            timestep (int): The timestep when this player was created.
-                Defaults to 1.
-
-        Raises:
-            KeyError: If hyperparameters does not contain one of the
-                variables that were defined as necessary when creating the
-                tree.
-            ValueError: If the id_str conflicts with an other node in the tree.
-        """
+        # TODO: Should this raise an error if the id is already taken?
         self.id = id
         self.parent = parent
         self.descendants: List[Player] = []
@@ -77,37 +51,32 @@ class Player:
         branch: Optional[str] = None
     ) -> 'Player':
 
-        """Adds a decendant to this node
+        """Adds a decendant to this player.
 
-        If `node` is directly specified then it will be added as a child.
-        Otherwise, the other parameters will be used to create a new node
-        and add it as a child.
+        :param Optional[str] id: The id of the child.
+            Defaults to None.
+        :param Optional[Interaction] interaction: All the models
+            other than the parent that contributed to the evolution.
+            Typically, that would be opponents and allies, or mates in
+            the case of genetic crossover.
+            For example, if the model played a game of chess against
+            an opponent and learned from it, the parent would be the
+            model before that game, and the contributor would be the
+            opponent. Defaults to None.
+            TODO: update interaction description.
+        :param Optional[int] timestep: The timestep when the descendent was
+            created. Defaults to 1.
+        :param Optional[str] branch: The branch this descendent belongs to.
+            Defaults to None.
 
-        Args:
-            model_parameters (Any): The model parameters of the child to be
-                added. Defaults to None.
-            id_str (str): The id_str of the child. If this is the empty string,
-                a unique id_str will be picked at random.
-                Defaults to the empty string.
-            hyperparameters (Dict[str, Any]): A dictionary of the
-                hyperparameters that define the transition from this node
-                to the new child. This should contain enough information to
-                reproduce the evolution step deterministically given the
-                parent and contributors parameters.
-                Defaults to an empty dict.
-            interaction (List[Player]): All the models
-                other than the parent that contributed to the evolution.
-                Typically, that would be opponents and allies, or mates in
-                the case of genetic crossover.
-                For example, if the model played a game of chess against
-                an opponent and learned from it, the parent would be the
-                model before that game, and the contributor would be the
-                opponent. Defaults to an empty list.
+        :return: The new descendant
+        :rtype: Player
 
-        Returns:
-            Player: The new descendant
-
+        .. seealso::
+            :meth:`popcore.Player.has_descendants`
         """
+
+        # TODO: Should this check the branch exists or create it otherwise?
 
         branch = self.branch if branch is None else branch
 
@@ -126,12 +95,26 @@ class Player:
         return descendant
 
     def has_descendants(self) -> bool:
+        """Returns True if the player has descendants
+
+        .. seealso::
+            :meth:`popcore.Player.add_descendant`"""
         return len(self.descendants) > 0
 
 
 class Team(Player):
     """
-       Team
+    A Team is a Player with an additional `members` attribute which is a
+    list of (sub)players that make up the team.
+
+    :param str id: The id of the Team. ids must be unique within each
+        population.
+    :param list[Player] members: The players that constitute the team.
+
+    .. seealso::
+        :class:`popcore.Player`
+
+        :class:`popcore.Population`
     """
     members: "list[Player]"
 
@@ -141,9 +124,14 @@ class Team(Player):
 
 
 class Interaction(Generic[GameOutcome]):
-    """_summary_
-        players: players involved in the game
-        scores: outcomes for each player involved in the game
+    """A list of the players that took part in an interaction, and their
+    individual outcomes.
+
+    :param List[Player] players: Players involved in the game.
+    :param Lists[GameOutcome] outcomes: outcomes for each player involved in
+        the game.
+    :param int timestep: The timestep when the interaction occured. Defaults to
+        0.
     """
 
     def __init__(
@@ -152,13 +140,6 @@ class Interaction(Generic[GameOutcome]):
         outcomes: List[GameOutcome],
         timestep: int = 0
     ):
-        """_summary_
-
-        Args:
-            players (List[Player]): TODO _description_
-            outcomes (List[OUTCOME]): TODO _description_
-            timestep (int): TODO: description
-        """
         assert len(players) == len(outcomes)
         assert timestep >= 0
         self._players = players

@@ -20,12 +20,9 @@ class TestPopulation(unittest.TestCase):
     def test_visual_construction(self):
         """Tree tracking the evolution of a strand of DNA along 3 evolutionary
         paths"""
-        # Visual test, uncomment the last line to see what the resulting trees
-        # look like and check that they make sense.
 
         with Population() as pop:
-            # tree.add_root("GGTCAACAAATCATAAAGATATTGG")  # Land snail DNA
-            new_DNA = "OOOOO"
+            new_DNA = "GGTCAACAAATCATAAAGATATTGG"  # Land snail DNA
             pop.branch("Lineage 1")
             pop.branch("Lineage 2")
             pop.branch("Lineage 3")
@@ -51,11 +48,15 @@ class TestPopulation(unittest.TestCase):
                 pop.checkout(branch)
 
                 hyperparameters = {"letter": letter, "spot": spot}
-                new_DNA, _ = TestPopulation.mutate(pop._player.parameters,
-                                                hyperparameters)
+                new_DNA, _ = TestPopulation.mutate(
+                    pop._player.parameters,
+                    hyperparameters
+                )
 
-                pop.commit(parameters=new_DNA,
-                        hyperparameters=hyperparameters)
+                pop.commit(
+                    parameters=new_DNA,
+                    hyperparameters=hyperparameters
+                )
 
     def test_linear(self):
         """This tests the correctness of the case where the population consists

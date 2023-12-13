@@ -11,7 +11,16 @@ from .storage.core import Serializer
 
 
 class PlayerKeyValueSerializer(Serializer[Player, dict]):
+    """A serializer that turns :class:`~popcore.core.Player` into dictionaries,
+        and dictionaries of the right format into
+        :class:`~popcore.core.Player`.
 
+    :param List[str] exclude_fields: The fields to exclude during
+        serialization. Defaults to ['descendants'].
+
+    .. seealso::
+        :class:`popcore.core.Player`
+    """
     def __init__(
         self,
         exclude_fields: List[str] = ['descendants']
@@ -20,6 +29,14 @@ class PlayerKeyValueSerializer(Serializer[Player, dict]):
         self._exclude_fields = exclude_fields
 
     def serialize(self, player: Player) -> dict:
+        """Creates a dictionary from the `player`, ignoring
+            `self._exclude_fields`
+
+        :param (Player) player: The player to turn into a dict.
+
+        :return: A dictionary summarizing the player.
+        :rtype: dict
+        """
         fields = {
             k: v for k, v in player.__dict__.items()
             if k not in self._exclude_fields
@@ -28,6 +45,15 @@ class PlayerKeyValueSerializer(Serializer[Player, dict]):
         return fields
 
     def deserialize(self, key_value_store: dict) -> 'Player':
+        """Turns a dictionary of the right format into a
+            :class:`~popcore.core.Player`.
+
+        :param dict key_value_store: The dictionary containing the player's
+            parameters.
+
+        :return: A player that corresponds to the dictionary passed.
+        :rtype: Player
+        """
         filtered = {
             k: v for k, v in key_value_store.items()
         }
@@ -35,11 +61,22 @@ class PlayerKeyValueSerializer(Serializer[Player, dict]):
 
 
 class PlayerAutoIdHook(Hook):
+    """Hook to automatically assign IDs to players that don't have one.
 
+    The ID is generated using cryptographic hashing.
+    """
     def __call__(
         self, repo: Repository, player: Player,
         *args, **kwds
     ):
+        """Automatically assign an ID to the player if it does not have one.
+
+        :param Repository repo: _description_
+        :param Player player: The player to automatically ID.
+        """
+
+        # TODO: repo unused, do we want to keep it as an arg?
+
         if player.id is not None:
             return player.id
 
@@ -50,9 +87,23 @@ class PlayerAutoIdHook(Hook):
 
 
 class Population:
-    """A data structure to manipulate evolving populations of agents.
-    The structure is meant to be similar to that of a git repository, where
-    every commit corresponds to an agent."""
+    """A data structure that records the evolution of populations of
+    agents. It behaves like a git repository, where each branch is a
+    unique agent and every commit corresponds to a specific iteration of
+    said agent.
+
+    This is initialized with a '_root' branch. Users should not commit
+    directly to this branch if they want to track multiple separate agents,
+    but rather create a branch for every new agent.
+
+    :param Optional[Player] root: If not none, the specified player becomes
+        the root of the population. Defaults to None.
+    :param str root_name: The id of the root. Defaults to `'_root'`.
+    :param str root_branch: The name of the root's branch.
+        Defaults to `'main'`.
+    :param Optional[Repository[Player]] stage: _description_. Defaults to
+        `'.popcache'`.
+    """
 
     def __init__(
         self,
@@ -61,18 +112,6 @@ class Population:
         root_branch: str = "main",
         stage: 'Optional[Repository[Player]]' = '.popcache',
     ):
-        """Instantiates population of players.
-
-        This is a data structure that records the evolution of populations of
-        agents. It behaves like a git repository, where each branch is a
-        unique agent and every commit corresponds to a specific iteration of
-        said agent.
-
-        This is initialized with a '_root' branch. Users should not commit
-        directly to this branch if they want to track multiple separate agents,
-        but rather create a branch for every new agent.
-        """
-
         root = root if root else Player(
             parent=None, id=root_name, branch=root_branch
         )
@@ -102,26 +141,21 @@ class Population:
     ) -> str:
         """Creates a new commit in the current branch.
 
-        Args: TODO:
-            parameters (Any): The parameters of the model to commit.
-                Defaults to None
-            hyperparameters (Dict[str, Any]): The hyperparameters to commit.
-                Defaults to an empty dict.
-            interaction (Interaction): The agents other than the parent that
-                contributed to the last training step (opponents, allies,
-                mates...). Defaults to an empty list.
-            name (str): A unique identifier for the commit (like the commit
-                hash in git). If this is None, an unique name will be
-                generated using cryptographic hashing. Defaults to None
-            pre_commit_hooks (List[PreCommitHooks]):
-            post_commit_hooks (List[PostCommitHooks]):
+        :param str id: A unique identifier for the commit (like the commit
+            hash in git). Defaults to None
+        :param Interaction interaction: The agents other than the parent that
+            contributed to the last training step (opponents, allies,
+            mates...). Defaults to None.
+            TODO: update interaction description
+        :param int timestep: The timestep when this commit was
+            made. Defaults to 1.
 
-        Raises:
-            ValueError: If a player with the specified name already exists
+        :raises ValueError: If a player with the specified id already exists
 
-        Returns:
-            str: The id_str of the new commit.
+        :return: The id_str of the new commit.
+        :rtype: str
         """
+        # TODO: have pre_commit_hooks and post_commit_hooks as kwargs?
         if self.repo.exists(id):
             raise ValueError(POPULATION_COMMIT_EXIST.format(id))
         # Create the child node
@@ -145,17 +179,21 @@ class Population:
     def branch(self, name: str = None) -> str:
         """Create a new branch diverging from the current branch.
 
-        Args:
-            name (str): The name of the new branch. Must be unique.
-                This will be a new alias to the current commit. If None, it
-                returns the name of the active branch
+        :param str name: The name of the new branch. Must be unique.
+            This will be a new alias to the current commit. If None, it
+            returns the name of the active branch. Defaults to None.
 
-        Raises:
-            ValueError: If a player with the specified name/alias already
+        :raises ValueError: If a branch with the specified name/alias already
             exists
 
-        Returns:
-            str: The name of the new commit"""
+        :return: The name of the new commit
+        :rtype: str
+
+        .. seealso::
+            :meth:`popcore.Population.branches`
+
+            :meth:`popcore.Population.checkout`
+        """
 
         if name is None:
             return self._branch
@@ -170,11 +208,18 @@ class Population:
     def checkout(self, name: str) -> str:
         """Set the current branch to the one specified.
 
-        Args:
-            name (str): The name of the branch or player to switch to.
+        :param str name: The name of the branch or player to switch to.
 
-        Raises:
-            ValueError: If there is no branch with the specified name"""
+        :raises ValueError: If there is no branch with the specified name
+
+        :return: The name of the branch checked out
+        :rtype: str
+
+        .. seealso::
+            :meth:`popcore.Population.branch`
+
+            :meth:`popcore.Population.branches`
+        """
 
         if not self.repo.exists(name):
             raise ValueError(POPULATION_PLAYER_NOT_EXIST.format(name))
@@ -191,26 +236,39 @@ class Population:
         return self._branch
 
     def branches(self) -> Set[str]:
-        """Returns a set of all branches"""
+        """Returns a set of all branches.
+
+        :rtype: Str[str]
+
+        .. seealso::
+            :meth:`popcore.Population.branch`
+
+            :meth:`popcore.Population.checkout`
+        """
         return set(self.repo._branches)
 
     def head(self) -> 'Player':
+        """Return a reference to the current commit.
+
+        :rtype: Player"""
         return self._player
 
     def detach(
         self,
     ) -> 'Population':
-        """Creates a Population with the current player as root.
+        """Creates a Population with the current commit as root.
 
         The new Population does not have any connection to the current one,
         hence this should be thread-safe. This may then be reattached once
         operations have been performed.
 
-        Returns:
-            Population: A new population with the current player as
-            root.
+        :returns: A new population with the current commit as root.
+        :rtype: Population
+
+        .. seealso::
+            :meth:`popcore.Population.attach`
         """
-        # TODO: detach persistence
+        # TODO: detach persistence. Plus this is broken
         detached_pop = Population(
             root=self._player,
             pre_commit_hooks=self._pre_commit_hooks,
@@ -246,23 +304,16 @@ class Population:
         in the operation, and that if one wishes to keep versions of these
         untouched, they should make a deepcopy beforehand.
 
-        Args:
-            population (Population): The population to merge in the current
-                object. It's root's id_str should correspond to the id_str of
-                an already existing node, which is where it will be attached.
-            id_hook (Callable[[str], str]): A function that takes the current
-                id_str of every commit in population and returns a new id_str
-                to be used when attaching. Note that if auto_rehash is set to
-                true, it happens before id_hook is called, hence the new
-                hashes is what this function will receive as argument.
-                Defaults to the identity function.
-            auto_rehash (bool): If set to true, re-generates an id_str for
-                every commit before attaching.
+        :param Population population: The population to merge in the current
+            object. It's root's id_str should correspond to the id_str of
+            an already existing node, which is where it will be attached.
 
-        Raises:
-            ValueError: If the population's root's id_str does not match any
-                current commit.
-            ValueError: If there is a collision between commit id_str.
+        :raises ValueError: If the population's root's id_str does not match
+            any current commit.
+        :raises ValueError: If there is a collision between commit id_str.
+
+        .. seealso::
+            :meth:`popcore.Population.detach`
         """
 
         # TODO Warning: If a model is saved in a detached pop, and the pop is
@@ -325,44 +376,58 @@ class Population:
         self._branches = self._branches.union(branches_to_add)
 
     def lineage(self, branch: str = None) -> Iterator[Player]:
-        """Returns an iterator with the commits in the given lineage (branch)
+        """Returns an iterator over all the commits in the given lineage
+        (branch).
 
-        Args:
-            population (Population): The population to iterate over.
+        :param Population population: The population to iterate over.
 
-            branch (str): The name of the branch to iterate over. If None,
-                iterate over the current branch. Defaults to None
+        :param str branch: The name of the branch to iterate over. If None,
+            iterate over the current branch. Defaults to None
 
-        Returns:
-            Iterator[Player]: An iterator over all commits in the given branch"""
+        :return: An iterator over all commits in the given branch
+        :rtype: Iterator[Player]
+
+        .. seealso::
+            :meth:`popcore.population.Population.generation`
+
+            :meth:`popcore.population.Population.flatten`
+        """
 
         lineage = self._get_ancesters(branch)[:-1]
         for player in self._get_players(lineage):
             yield player
 
     def generation(self, generation: int = -1) -> Iterator[Player]:
-        """Returns an iterator with the players in the given generation
+        """Returns an iterator over the commits in the given generation.
 
-        Args:
-            population (Population): The population to iterate over.
+        :param Population population: The population to iterate over.
 
-            gen (int): The generation to iterate over. Defaults to -1 (meaning the
-                last generation).
+        :param int gen: The generation to iterate over. Defaults to -1
+            (meaning the last generation).
 
-        Returns:
-            Iterator[Player]: An iterator over all commits in the given generation
+        :retun: An iterator over all commits in the given generation
+        :rtype: Iterator[Player]
+
+        .. seealso::
+            :meth:`popcore.population.Population.lineage`
+
+            :meth:`popcore.population.Population.flatten`
         """
 
         raise NotImplementedError()
 
     def flatten(self) -> Iterator[Player]:
-        """Returns an iterator with all the players in the population
+        """Returns an iterator over all the commits in the population.
 
-        Args:
-            population (Population): The population to iterate over.
+        :param Population population: The population to iterate over.
 
-        Returns:
-            Iterator[Player]: An iterator over all commits in the given population
+        :return: An iterator over all commits in the given population
+        :rtype: Iterator[Player]
+
+        .. seealso::
+            :meth:`popcore.population.Population.lineage`
+
+            :meth:`popcore.population.Population.generation`
         """
 
         lineage = self._get_descendents(self._root.id)[1:]
@@ -395,13 +460,15 @@ class Population:
     def _get_player(self, name: str = None) -> Player:
         """Returns the commit with the given id_str if it exists.
 
-            Args:
-                name (str): The name of the commit we are trying to get. If
-                    id_str is the empty string, returns the latest commit of the
-                    current branch. Defaults to the empty string.
+        Args:
+            name (str): The name of the commit we are trying to get. If
+                id_str is the empty string, returns the latest commit of
+                the current branch. Defaults to the empty string.
 
-            Raises:
-                ValueError: If a commit with the specified `name` does not exist"""
+        Raises:
+            ValueError: If a commit with the specified `name` does not
+            exist
+        """
 
         if name is None:
             return self._player
@@ -479,4 +546,3 @@ class Population:
             history.extend(self._get_descendents(player.id))
 
         return history
-
