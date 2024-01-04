@@ -1,6 +1,6 @@
 import unittest
 from popcore.population import Population
-from popcore.iterators import lineage
+from popcore.iter import lineage
 import random
 from examples.dna.fixtures import (
     random_linear_dna_evolution, nonlinear_population,

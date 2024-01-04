@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from typing import Iterator, List, Optional, Set
 from hashlib import sha1
 
@@ -49,17 +50,89 @@ class PlayerAutoIdHook(Hook):
         # player.path = f"{parent.path}/{player.id}"
 
 
+@dataclass
+class MetaNode:
+    player: Player
+    parent: 'MetaNode'
+    descendants: List['MetaNode']
+    interaction: Optional[Interaction] = None
+    generation: Optional[int] = 0
+    timestep: Optional[int] = 1
+    branch: Optional[str] = 0
+    id: str = None
+
+    def __post_init__(self):
+        if self.player is not None:
+            self.id = self.player.id
+
+    def add_descendant(
+        self,
+        player: Player,
+        interaction: Optional['Interaction'] = None,
+        timestep: Optional[int] = 1,
+        branch: Optional[str] = None
+    ) -> 'Player':
+
+        """Adds a decendant to this node
+
+        If `node` is directly specified then it will be added as a child.
+        Otherwise, the other parameters will be used to create a new node
+        and add it as a child.
+
+        Args:
+            model_parameters (Any): The model parameters of the child to be
+                added. Defaults to None.
+            id_str (str): The id_str of the child. If this is the empty string,
+                a unique id_str will be picked at random.
+                Defaults to the empty string.
+            hyperparameters (Dict[str, Any]): A dictionary of the
+                hyperparameters that define the transition from this node
+                to the new child. This should contain enough information to
+                reproduce the evolution step deterministically given the
+                parent and contributors parameters.
+                Defaults to an empty dict.
+            interaction (List[Player]): All the models
+                other than the parent that contributed to the evolution.
+                Typically, that would be opponents and allies, or mates in
+                the case of genetic crossover.
+                For example, if the model played a game of chess against
+                an opponent and learned from it, the parent would be the
+                model before that game, and the contributor would be the
+                opponent. Defaults to an empty list.
+
+        Returns:
+            Player: The new descendant
+
+        """
+
+        branch = self.branch if branch is None else branch
+
+        # Create child node
+        descendant = MetaNode(
+            player=player,
+            parent=self,
+            interaction=interaction,
+            generation=self.generation + 1,
+            timestep=timestep,
+            branch=branch
+        )
+
+        self.descendants.append(descendant)
+
+        return descendant
+
+
 class Population:
-    """A data structure to manipulate evolving populations of agents.
+    """A data structure to manipulate evolving populations of players.
     The structure is meant to be similar to that of a git repository, where
     every commit corresponds to an agent."""
 
     def __init__(
         self,
-        root: 'Optional[Player]' = None,
+        root: Optional[MetaNode] = None,
         root_name: str = "_root",
         root_branch: str = "main",
-        stage: 'Optional[Repository[Player]]' = '.popcache',
+        stage: 'Optional[Repository[MetaNode]]' = '.popcache',
     ):
         """Instantiates population of players.
 
@@ -73,8 +146,8 @@ class Population:
         but rather create a branch for every new agent.
         """
 
-        root = root if root else Player(
-            parent=None, id=root_name, branch=root_branch
+        root = root if root else MetaNode(
+            player=None, parent=None, branch=root_branch
         )
         self._root = root
 
@@ -324,51 +397,6 @@ class Population:
         self._nodes.update(nodes_to_add)
         self._branches = self._branches.union(branches_to_add)
 
-    def lineage(self, branch: str = None) -> Iterator[Player]:
-        """Returns an iterator with the commits in the given lineage (branch)
-
-        Args:
-            population (Population): The population to iterate over.
-
-            branch (str): The name of the branch to iterate over. If None,
-                iterate over the current branch. Defaults to None
-
-        Returns:
-            Iterator[Player]: An iterator over all commits in the given branch"""
-
-        lineage = self._get_ancesters(branch)[:-1]
-        for player in self._get_players(lineage):
-            yield player
-
-    def generation(self, generation: int = -1) -> Iterator[Player]:
-        """Returns an iterator with the players in the given generation
-
-        Args:
-            population (Population): The population to iterate over.
-
-            gen (int): The generation to iterate over. Defaults to -1 (meaning the
-                last generation).
-
-        Returns:
-            Iterator[Player]: An iterator over all commits in the given generation
-        """
-
-        raise NotImplementedError()
-
-    def flatten(self) -> Iterator[Player]:
-        """Returns an iterator with all the players in the population
-
-        Args:
-            population (Population): The population to iterate over.
-
-        Returns:
-            Iterator[Player]: An iterator over all commits in the given population
-        """
-
-        lineage = self._get_descendents(self._root.id)[1:]
-        for player in self._get_players(lineage):
-            yield player
-
     @property
     def stage(self):
         return self.repo._stage
@@ -391,92 +419,3 @@ class Population:
             branch_renaming[branch] = new_branch
 
         return branches_to_add, branch_renaming
-
-    def _get_player(self, name: str = None) -> Player:
-        """Returns the commit with the given id_str if it exists.
-
-            Args:
-                name (str): The name of the commit we are trying to get. If
-                    id_str is the empty string, returns the latest commit of the
-                    current branch. Defaults to the empty string.
-
-            Raises:
-                ValueError: If a commit with the specified `name` does not exist"""
-
-        if name is None:
-            return self._player
-
-        if name not in self._objects:
-            raise ValueError(POPULATION_PLAYER_NOT_EXIST.format(name))
-
-        return self.repo.commit(name)
-
-    def _get_players(self, names: List[str]) -> List[Player]:
-        """Returns the commit with the given id_str if it exists.
-
-        Args:
-            id_strs (List[str]): The id_str of the commits we are trying to
-                get.
-
-        Raises:
-            KeyError: If a commit with one of the specified id_str does not
-                exist
-        """
-
-        return [self._get_player(name) for name in names]
-
-    def _get_ancesters(self, name: str = None) -> List[str]:
-        """Returns a list of all id_str of commits that came before the one
-        with specified id_str.
-
-        If id_str is not specified, it will return the commit history of the
-        latest commit of the current branch.
-        The list is of all commits that led to the specified commit. This
-        means that commits from sister branches will not be included even if
-        they may be more recent. However commits from ancestor branches would
-        be included, up to _root.
-
-        The list returned is in inverse chronological order, so the most
-        recent commit appears first, and the oldest last."""
-
-        player: None | Player  # Mypy cries if I don't specify that
-
-        if name is None:
-            player = self._player
-        else:
-            if not self.repo.exists(name):
-                raise ValueError(POPULATION_PLAYER_NOT_EXIST.format(name))
-            player = self.repo.commit(name)
-
-        history = [player.id]
-        player = player.parent
-        while player is not None:
-            history.append(player.id)
-            player = player.parent
-
-        return history
-
-    def _get_descendents(self, name: str = None) -> List[str]:
-        """Returns a list of all id_str of commits that came after the one
-        with specified id_str, including branches.
-
-        If id_str is not specified, it will default to the current commit.
-        The list is of all commits that originate from the specified commit.
-
-        The list returned is in no particular order."""
-
-        player: None | Player  # Mypy cries if I don't specify that
-
-        if name is None:
-            player = self._player
-        else:
-            if not self.repo.exists(name):
-                raise ValueError(POPULATION_PLAYER_NOT_EXIST.format(name))
-            player = self.repo.commit(name)
-
-        history = [player.id]
-        for player in player.descendants:
-            history.extend(self._get_descendents(player.id))
-
-        return history
-

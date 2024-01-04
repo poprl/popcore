@@ -1,5 +1,5 @@
 from .population import Population
-from .iterators import flatten
+from .iter import flatten
 
 
 def draw(population: Population):

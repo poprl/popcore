@@ -1,178 +1,176 @@
-from typing import Generic, List, Optional, TypeVar
+from dataclasses import dataclass
+from typing import Any, Generic, Iterable, List, TypeVar
+
+import numpy as np
+import numpy.typing as npt
 
 
 GameOutcome = TypeVar("GameOutcome")
 
 
+@dataclass
 class Player:
     """
-        Player
+        Player abstraction
     """
-    def __init__(
-        self,
-        id: Optional[str] = None,
-        parent: 'Optional[Player]' = None,
-        interaction: 'Optional[Interaction]' = None,
-        generation: Optional[int] = 0,
-        timestep: Optional[int] = 1,
-        branch: Optional[str] = None,
-    ):
+    id: str
 
-        """A specific version of an agent at a given point in time.
+    def __eq__(self, other: 'Player') -> bool:
+        return self.id == other.id
 
-        This is equivalent to a commit in the population.
+    def __str__(self) -> str:
+        return self.id
 
-        Args: TODO
-            parent (Player | None): The parent of this player.
-                If None, this is considered a root. Every player may only
-                have one parent, but if it needs more, it can have
-                arbitrarily many contributors. Defaults to None
-            model_parameters (Any): The parameters of the model. With
-                neural networks, that would be the weights and biases.
-                Defaults to None.
-            id_str (str): The id_str of the player to find it in the pop.
-                id_strs must be unique within each pop. Defaults to the empty
-                string.
-            hyperparameters (Dict[str, Any]): A dictionary of the
-                hyperparameters that define the transition from the parent
-                to this player. This should contain enough information to
-                reproduce the evolution step deterministically given the
-                parent and contributors parameters.
-                Defaults to an empty dict.
-            contributors (List[PhylogeneticTree.Node]): All the models
-                other than the parent that contributed to the evolution.
-                Typically, that would be opponents and allies, or mates in
-                the case of genetic crossover.
-                For example, if the model played a game of chess against
-                an opponent and learned from it, the parent would be the
-                model before that game, and the contributor would be the
-                opponent. Defaults to an empty list.
-            generation (int): The generation this player belongs to.
-                Defaults to 1.
-            timestep (int): The timestep when this player was created.
-                Defaults to 1.
-
-        Raises:
-            KeyError: If hyperparameters does not contain one of the
-                variables that were defined as necessary when creating the
-                tree.
-            ValueError: If the id_str conflicts with an other node in the tree.
-        """
-        self.id = id
-        self.parent = parent
-        self.descendants: List[Player] = []
-
-        self.interaction = interaction
-
-        self.generation: int = generation
-        self.timestep: int = timestep
-
-        self.branch = branch
-
-    def add_descendant(
-        self,
-        id: Optional[str] = None,
-        interaction: Optional['Interaction'] = None,
-        timestep: Optional[int] = 1,
-        branch: Optional[str] = None
-    ) -> 'Player':
-
-        """Adds a decendant to this node
-
-        If `node` is directly specified then it will be added as a child.
-        Otherwise, the other parameters will be used to create a new node
-        and add it as a child.
-
-        Args:
-            model_parameters (Any): The model parameters of the child to be
-                added. Defaults to None.
-            id_str (str): The id_str of the child. If this is the empty string,
-                a unique id_str will be picked at random.
-                Defaults to the empty string.
-            hyperparameters (Dict[str, Any]): A dictionary of the
-                hyperparameters that define the transition from this node
-                to the new child. This should contain enough information to
-                reproduce the evolution step deterministically given the
-                parent and contributors parameters.
-                Defaults to an empty dict.
-            interaction (List[Player]): All the models
-                other than the parent that contributed to the evolution.
-                Typically, that would be opponents and allies, or mates in
-                the case of genetic crossover.
-                For example, if the model played a game of chess against
-                an opponent and learned from it, the parent would be the
-                model before that game, and the contributor would be the
-                opponent. Defaults to an empty list.
-
-        Returns:
-            Player: The new descendant
-
-        """
-
-        branch = self.branch if branch is None else branch
-
-        # Create child node
-        descendant = Player(
-            id=id,
-            parent=self,
-            interaction=interaction,
-            generation=self.generation + 1,
-            timestep=timestep,
-            branch=branch
-        )
-
-        self.descendants.append(descendant)
-
-        return descendant
+    def __repr__(self) -> str:
+        return f"Player(id={self.id})"
 
     def has_descendants(self) -> bool:
         return len(self.descendants) > 0
 
 
+@dataclass
 class Team(Player):
     """
-       Team
+       A team is a collection of players that act together.
     """
     members: "list[Player]"
 
-    def __init__(self, id: str, members: "list[Player]"):
-        self.members = members
-        super().__init__(id)
 
-
+@dataclass
 class Interaction(Generic[GameOutcome]):
     """_summary_
         players: players involved in the game
         scores: outcomes for each player involved in the game
     """
+    players: List[Player]
+    outcomes: List[GameOutcome]
+
+    def __repr__(self) -> str:
+        repr = [
+            f"{p}:{o}"
+            for p, o in zip(self.players, self.outcomes)
+        ]
+        repr = ", ".join(repr)
+        return f"Interaction({repr})"
+
+
+@dataclass
+class TimedIntereaction(Interaction[GameOutcome]):
+    timestep: int
+
+    def __repr__(self) -> str:
+        rep = super().__repr__()
+        return f"TimedInteraction(step={self.timestep}, interaction={rep})"
+
+
+PlayerType = TypeVar("PlayerType", bound=Player)
+
+
+class Population(Generic[PlayerType]):
+    """
+        The Population class implements a storage for any collection
+        of players.
+    """
 
     def __init__(
-        self,
-        players: List[Player],
-        outcomes: List[GameOutcome],
-        timestep: int = 0
-    ):
-        """_summary_
-
-        Args:
-            players (List[Player]): TODO _description_
-            outcomes (List[OUTCOME]): TODO _description_
-            timestep (int): TODO: description
+            self, uid: str, players: Iterable[PlayerType]):
         """
-        assert len(players) == len(outcomes)
-        assert timestep >= 0
-        self._players = players
-        self._outcomes = outcomes
-        self._timestep = timestep
+
+        :param uid: Unique identifier for the population.
+        :type uid: str
+        :param players: List of players that belong to the population.
+        :type players: Iterable[Player]
+        """
+
+        self.uid = uid
+        self._players = dict[str, Player]()
+        for player in players:
+            self.aggregate(player)
+
+    def aggregate(self, player: PlayerType):
+        """
+            Adds a player to the population
+
+        :param player: the player to be added to the population.
+                        The player identifier should be unique.
+        :type player: Player
+        """
+        assert player.id not in self._players
+        self._players[player.id] = player
 
     @property
-    def players(self):
-        return self._players
+    def players(self) -> np.ndarray[Any, PlayerType]:
+        """
+            Returns a numpy array with players in the population.
+
+        :return: A numpy array with the players in the population.
+        :rtype: np.ndarray[Any, PlayerType]
+        """
+        return np.array(self._players.values())
 
     @property
-    def outcomes(self):
-        return self._outcomes
+    def size(self):
+        return len(self._players)
 
-    @property
-    def timestep(self):
-        return self._timestep
+    def __iter__(self):
+        return self.players
+
+    def __str__(self) -> str:
+        return self.uid
+
+    def __repr__(self) -> str:
+        return f"Population(id={self.uid})"
+
+    def __contains__(self, player: PlayerType | str) -> bool:
+        if isinstance(player, str):
+            return player in self._players
+
+        if isinstance(player, Player):
+            return player in self.players
+
+        raise ValueError()  # TODO: codify exception
+
+    @classmethod
+    def from_players_uid(
+        cls, uid: str, players_uid: Iterable[str]
+    ) -> 'Population[PlayerType]':
+        """
+            Constructs a Population object from an iterable of unique
+            players identifiers.
+
+        :param uid: Unique identifier for the population.
+        :type population_id: str
+        :param players: A sequence of players' unique identifiers
+        :type players: Iterable[str]
+        :return: A population containing a collection of players.
+        :rtype: Population
+        """
+        # TODO: implement exception handling here.
+        assert cls == Population, "Do not call from subclasses"
+
+        population = Population[PlayerType](uid)
+        for player_id in players_uid:
+            population.add(
+                Player(player_id)
+            )
+        return population
+
+    @classmethod
+    def from_players_interactions(
+        cls, uid: str, interactions: List[Interaction]
+    ) -> 'Population':
+        """
+           Constructs a population of players from a set of interactions.
+
+        :param interactions: _description_
+        :type interactions: List[Interaction]
+        :return: _description_
+        :rtype: Population
+        """
+        population = Population(uid=uid, players=[])
+        for interaction in interactions:
+            for player in interaction.players:
+                if player.id not in population:
+                    population.aggregate(player)
+
+        return population
