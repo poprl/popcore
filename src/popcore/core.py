@@ -1,8 +1,7 @@
 from dataclasses import dataclass
-from typing import Any, Generic, Iterable, List, TypeVar
+from typing import Any, Generic, Iterable, List, Optional, TypeVar, Union
 
 import numpy as np
-import numpy.typing as npt
 
 
 GameOutcome = TypeVar("GameOutcome")
@@ -24,9 +23,6 @@ class Player:
     def __repr__(self) -> str:
         return f"Player(id={self.id})"
 
-    def has_descendants(self) -> bool:
-        return len(self.descendants) > 0
-
 
 @dataclass
 class Team(Player):
@@ -38,9 +34,12 @@ class Team(Player):
 
 @dataclass
 class Interaction(Generic[GameOutcome]):
-    """_summary_
+    """
+        Records an interaction between players, and each
+        player outcome.
+
         players: players involved in the game
-        scores: outcomes for each player involved in the game
+        outcomes: outcomes for each player involved in the game
     """
     players: List[Player]
     outcomes: List[GameOutcome]
@@ -52,6 +51,74 @@ class Interaction(Generic[GameOutcome]):
         ]
         repr = ", ".join(repr)
         return f"Interaction({repr})"
+
+
+class History(Generic[GameOutcome]):
+
+    def __init__(
+        self, interactions: Iterable[Interaction[GameOutcome]]
+    ):
+        self._interactions = interactions
+        self._population = Population.from_players_interactions(
+            interactions
+        )
+
+    @property
+    def players(self) -> List[Player]:
+        """  
+           Returns the list of players involved
+           in the interactions.
+
+        :return: list of players in the interactions.
+        :rtype: List[Player]
+        """
+        return list(self._population.players)
+
+    def __iter__(self) -> Iterable[Interaction[GameOutcome]]:
+        return self._interactions
+
+    def to_winrates(self) -> np.ndarray:
+        """
+           Reduces the list of interactions to a
+           pairwise win rates matrix.
+
+        :return: pairwise win rates matrix.
+        :rtype: np.ndarray
+        """
+        pass
+
+    def to_payoffs(
+        self,
+        reduce: Optional[str] = "avg"
+    ) -> np.ndarray:
+        """
+            Reduces the list of interactions to a pairwise
+            payoff matrix using a reduction strategy.
+
+        :param reduce: strategy used to reduce multiple pairwise 
+            interactions between the same players. "sum" or "avg".
+            Defaults to "avg"
+        :type reduce: str, optional
+        :raises ValueError: _description_
+        :return: _description_
+        :rtype: np.ndarray
+        """
+        pass
+
+    @classmethod
+    def from_interactions(
+        cls,
+        interactions: Union[
+            Iterable[Interaction[GameOutcome]],
+            'History[GameOutcome]'
+        ]
+    ) -> 'History[GameOutcome]':
+        if isinstance(interactions, History):
+            return interactions
+        elif isinstance(interactions, Iterable):
+            return History(interactions)
+
+        raise ValueError()  # TODO: exception raising.
 
 
 @dataclass
