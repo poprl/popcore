@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from typing import Generic, Iterable, List, Optional
 
-from .core import (
+from ._core import (
     Interaction, Population, PlayerType
 )
 

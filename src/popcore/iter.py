@@ -1,5 +1,5 @@
 from typing import Iterator, List
-from .core import Player
+from ._core import Player
 from .population import Population
 from .errors import POPULATION_PLAYER_NOT_EXIST
 

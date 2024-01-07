@@ -6,7 +6,7 @@ from .errors import (
     POPULATION_COMMIT_EXIST, POPUPLATION_BRANCH_EXISTS,
     POPULATION_PLAYER_NOT_EXIST
 )
-from .core import Interaction, Player
+from ._core import Interaction, Player
 from .storage.repo import Repository, Hook
 from .storage.core import Serializer
 

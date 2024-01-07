@@ -25,11 +25,14 @@ class Player:
 
 
 @dataclass
-class Team(Player):
+class Coalition(Player):
     """
-       A team is a collection of players that act together.
+       A coalition is a collection of players that act together.
     """
-    members: "list[Player]"
+    members: list[Player]
+
+    def __repr__(self) -> str:
+        return f"Coalition({str([player for player in self.members])})"
 
 
 @dataclass

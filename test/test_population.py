@@ -1,5 +1,5 @@
 import unittest
-from popcore.core import Interaction
+from popcore._core import Interaction
 from popcore.population import Population
 
 
