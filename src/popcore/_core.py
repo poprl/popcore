@@ -83,16 +83,16 @@ class History(Generic[GameOutcome]):
     def to_winrates(self) -> np.ndarray:
         """
            Reduces the list of interactions to a
-           pairwise win rates matrix.
+           pairwise win rate matrix.
 
         :return: pairwise win rates matrix.
         :rtype: np.ndarray
         """
         pass
 
-    def to_payoffs(
+    def to_payoff_matrix(
         self,
-        reduce: Optional[str] = "avg"
+        reduction: Optional[str] = "sum"
     ) -> np.ndarray:
         """
             Reduces the list of interactions to a pairwise
@@ -100,13 +100,28 @@ class History(Generic[GameOutcome]):
 
         :param reduce: strategy used to reduce multiple pairwise 
             interactions between the same players. "sum" or "avg".
-            Defaults to "avg"
+            Defaults to "sum"
         :type reduce: str, optional
         :raises ValueError: _description_
         :return: _description_
         :rtype: np.ndarray
         """
-        pass
+        players = self.players
+        n_players = len(players)
+        payoffs = np.zeros(shape=(n_players, n_players), dtype=np.float32)
+
+        for interaction in self._interactions:
+            player = self._population[interaction.players[0]]
+            opponent = self._population[interaction.players[1]]
+            if reduction == "sum":
+                payoffs[player, opponent] += interaction.outcomes[0]
+                payoffs[opponent, player] += interaction.outcomes[1]
+            elif reduction == "avg":
+                raise NotImplementedError()
+            else:
+                raise ValueError()  # TODO: Execption handling.
+
+        return payoffs
 
     @classmethod
     def from_interactions(
@@ -154,6 +169,8 @@ class Population(Generic[PlayerType]):
 
         self.uid = uid
         self._players = dict[str, Player]()
+        self._players_idx = dict[int, str]()
+        self._size: int = 0
         for player in players:
             self.aggregate(player)
 
@@ -167,6 +184,8 @@ class Population(Generic[PlayerType]):
         """
         assert player.id not in self._players
         self._players[player.id] = player
+        self._players_idx[player.id] = self._size
+        self._size += 1
 
     @property
     def players(self) -> np.ndarray[Any, PlayerType]:
@@ -176,7 +195,7 @@ class Population(Generic[PlayerType]):
         :return: A numpy array with the players in the population.
         :rtype: np.ndarray[Any, PlayerType]
         """
-        return np.array(self._players.values())
+        return np.array([player for player in self._players.values()])
 
     @property
     def size(self):
@@ -191,6 +210,10 @@ class Population(Generic[PlayerType]):
     def __repr__(self) -> str:
         return f"Population(id={self.uid})"
 
+    def __getitem__(self, player_id: str) -> int:
+        assert player_id in self._players
+        return self._players_idx[player_id]
+    
     def __contains__(self, player: PlayerType | str) -> bool:
         if isinstance(player, str):
             return player in self._players
@@ -227,7 +250,7 @@ class Population(Generic[PlayerType]):
 
     @classmethod
     def from_players_interactions(
-        cls, uid: str, interactions: List[Interaction]
+        cls, interactions: List[Interaction], uid: Optional[str] = None
     ) -> 'Population':
         """
            Constructs a population of players from a set of interactions.
@@ -240,6 +263,8 @@ class Population(Generic[PlayerType]):
         population = Population(uid=uid, players=[])
         for interaction in interactions:
             for player in interaction.players:
+                if isinstance(player, str):
+                    player = Player(player)
                 if player.id not in population:
                     population.aggregate(player)
 
