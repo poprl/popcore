@@ -1,6 +1,9 @@
 from dataclasses import dataclass
-from typing import Any, Generic, Iterable, List, Optional, TypeVar, Union
-
+from itertools import combinations
+from typing import (
+    Any, Generic, Iterable, List,
+    Optional, TypeVar, Union
+)
 import numpy as np
 
 
@@ -24,6 +27,9 @@ class Player:
         return f"Player(id={self.id})"
 
 
+PlayerLike = Union[Player, str]
+
+
 @dataclass
 class Coalition(Player):
     """
@@ -44,8 +50,28 @@ class Interaction(Generic[GameOutcome]):
         players: players involved in the game
         outcomes: outcomes for each player involved in the game
     """
-    players: List[Player]
-    outcomes: List[GameOutcome]
+
+    def __init__(
+        self, players: Iterable[PlayerLike], outcomes: Iterable[GameOutcome]
+    ):
+        self._players = np.array(players)
+        self._outcomes = np.array(outcomes)
+
+        # TODO: exception handling
+        if self._players.shape[-1] < 2:
+            raise ValueError("interaction.at_leastpairwise")
+
+        # TODO: exception handling
+        if self._players.shape != self._outcomes.shape:
+            raise ValueError("interaction.same_shape")
+
+    @property
+    def players(self) -> List[Player]:
+        return self._players.tolist()
+
+    @property
+    def outcomes(self) -> List[GameOutcome]:
+        return self._outcomes.tolist()
 
     def __repr__(self) -> str:
         repr = [
@@ -54,6 +80,42 @@ class Interaction(Generic[GameOutcome]):
         ]
         repr = ", ".join(repr)
         return f"Interaction({repr})"
+
+    @property
+    def order(self) -> int:
+        return self._players.shape[-1]
+
+    def as_pairs(self) -> 'List[Interaction]':
+        """
+           Use this method to converts the current, possibly multiplayer,
+           multioutcome interaction into a set of pairwise interactions.
+
+        :raises ValueError: if the order of the current interaction is
+            is less than 2.
+        :return: a list of pairwise interactions derived from the current
+            interaction.
+        :rtype: List[Interaction]
+        """
+
+        if self.order == 2:
+            return [self]
+
+        interactions = []
+        for player, opponent in combinations(
+            zip(self.players, self.outcomes), 2
+        ):
+            players, outcomes = zip(player, opponent)
+            interactions.append(
+                Interaction(players, outcomes)
+            )
+
+        return interactions
+
+    def __eq__(self, other: 'Interaction') -> bool:
+        return (
+            np.array_equal(self._players, other._players) and
+            np.array_equal(self._outcomes, other._outcomes)
+        )
 
 
 class History(Generic[GameOutcome]):
@@ -80,49 +142,6 @@ class History(Generic[GameOutcome]):
     def __iter__(self) -> Iterable[Interaction[GameOutcome]]:
         return self._interactions
 
-    def to_winrates(self) -> np.ndarray:
-        """
-           Reduces the list of interactions to a
-           pairwise win rate matrix.
-
-        :return: pairwise win rates matrix.
-        :rtype: np.ndarray
-        """
-        pass
-
-    def to_payoff_matrix(
-        self,
-        reduction: Optional[str] = "sum"
-    ) -> np.ndarray:
-        """
-            Reduces the list of interactions to a pairwise
-            payoff matrix using a reduction strategy.
-
-        :param reduce: strategy used to reduce multiple pairwise 
-            interactions between the same players. "sum" or "avg".
-            Defaults to "sum"
-        :type reduce: str, optional
-        :raises ValueError: _description_
-        :return: _description_
-        :rtype: np.ndarray
-        """
-        players = self.players
-        n_players = len(players)
-        payoffs = np.zeros(shape=(n_players, n_players), dtype=np.float32)
-
-        for interaction in self._interactions:
-            player = self._population[interaction.players[0]]
-            opponent = self._population[interaction.players[1]]
-            if reduction == "sum":
-                payoffs[player, opponent] += interaction.outcomes[0]
-                payoffs[opponent, player] += interaction.outcomes[1]
-            elif reduction == "avg":
-                raise NotImplementedError()
-            else:
-                raise ValueError()  # TODO: Execption handling.
-
-        return payoffs
-
     @classmethod
     def from_interactions(
         cls,
@@ -148,7 +167,7 @@ class TimedIntereaction(Interaction[GameOutcome]):
         return f"TimedInteraction(step={self.timestep}, interaction={rep})"
 
 
-PlayerType = TypeVar("PlayerType", bound=Player)
+PlayerType = TypeVar("PlayerType", bound=PlayerLike)
 
 
 class Population(Generic[PlayerType]):
@@ -168,7 +187,7 @@ class Population(Generic[PlayerType]):
         """
 
         self.uid = uid
-        self._players = dict[str, Player]()
+        self._players = dict[str, PlayerType]()
         self._players_idx = dict[int, str]()
         self._size: int = 0
         for player in players:
@@ -199,7 +218,7 @@ class Population(Generic[PlayerType]):
 
     @property
     def size(self):
-        return len(self._players)
+        return self._size
 
     def __iter__(self):
         return self.players
@@ -213,8 +232,8 @@ class Population(Generic[PlayerType]):
     def __getitem__(self, player_id: str) -> int:
         assert player_id in self._players
         return self._players_idx[player_id]
-    
-    def __contains__(self, player: PlayerType | str) -> bool:
+
+    def __contains__(self, player: PlayerType) -> bool:
         if isinstance(player, str):
             return player in self._players
 

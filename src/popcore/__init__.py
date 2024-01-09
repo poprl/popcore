@@ -1,10 +1,10 @@
-from ._core import ( # noqa
+from ._core import (
     Player, Interaction, Coalition, Population,
-    History
+    History, PlayerLike
 )
 
 
 __all__ = [
     "Player", "Interaction", "Coalition",
-    "Population", "History"
+    "Population", "History", "PlayerLike"
 ]

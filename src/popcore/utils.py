@@ -2,6 +2,7 @@ from .population import Population
 from .iter import flatten
 
 
+
 def draw(population: Population):
     """Displays the phylogenetic tree.
 
