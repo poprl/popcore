@@ -2,6 +2,5 @@ import unittest
 
 
 class TestPopulation(unittest.TestCase):
+    pass
 
-    def test_build(self):
-        self.assertTrue(True)

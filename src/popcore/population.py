@@ -1,90 +1,79 @@
-from typing import List, Dict, Any, Callable, Set, Iterator
+from dataclasses import dataclass
+from typing import Iterator, List, Optional, Set
 from hashlib import sha1
 
-# TODO: Saving/loading whole population (not in MVP, do later)
-# TODO: pop.fork() -> Population (not in MVP, for later)
-# TODO: pop.merge(Population) -> Population (not in MVP, for later)
+from .errors import (
+    POPULATION_COMMIT_EXIST, POPUPLATION_BRANCH_EXISTS,
+    POPULATION_PLAYER_NOT_EXIST
+)
+from ._core import Interaction, Player
+from .storage.repo import Repository, Hook
+from .storage.core import Serializer
 
 
-class Player:
-    def __init__(self,
-                 parent: 'Player | None' = None,
-                 model_parameters: Any = None,
-                 id_str: str = '',
-                 hyperparameters: Dict[str, Any] | None = None,
-                 contributors: 'List[Player] | None' = None,
-                 generation: int = 0,
-                 timestep: int = 1,
-                 branch_name: str = ''):
+class PlayerKeyValueSerializer(Serializer[Player, dict]):
 
-        """A specific version of an agent at a given point in time.
+    def __init__(
+        self,
+        exclude_fields: List[str] = ['descendants']
+    ) -> None:
+        super().__init__()
+        self._exclude_fields = exclude_fields
 
-        This is equivalent to a commit in the population.
+    def serialize(self, player: Player) -> dict:
+        fields = {
+            k: v for k, v in player.__dict__.items()
+            if k not in self._exclude_fields
+        }
+        fields['parent'] = player.parent.id if player.parent else None
+        return fields
 
-        Args:
-            parent (Player | None): The parent of this player.
-                If None, this is considered a root. Every player may only
-                have one parent, but if it needs more, it can have
-                arbitrarily many contributors. Defaults to None
-            model_parameters (Any): The parameters of the model. With
-                neural networks, that would be the weights and biases.
-                Defaults to None.
-            id_str (str): The id_str of the player to find it in the pop.
-                id_strs must be unique within each pop. Defaults to the empty
-                string.
-            hyperparameters (Dict[str, Any]): A dictionary of the
-                hyperparameters that define the transition from the parent
-                to this player. This should contain enough information to
-                reproduce the evolution step deterministically given the
-                parent and contributors parameters.
-                Defaults to an empty dict.
-            contributors (List[PhylogeneticTree.Node]): All the models
-                other than the parent that contributed to the evolution.
-                Typically, that would be opponents and allies, or mates in
-                the case of genetic crossover.
-                For example, if the model played a game of chess against
-                an opponent and learned from it, the parent would be the
-                model before that game, and the contributor would be the
-                opponent. Defaults to an empty list.
-            generation (int): The generation this player belongs to.
-                Defaults to 1.
-            timestep (int): The timestep when this player was created.
-                Defaults to 1.
+    def deserialize(self, key_value_store: dict) -> 'Player':
+        filtered = {
+            k: v for k, v in key_value_store.items()
+        }
+        return Player(**filtered)
 
-        Raises:
-            KeyError: If hyperparameters does not contain one of the
-                variables that were defined as necessary when creating the
-                tree.
-            ValueError: If the id_str conflicts with an other node in the tree.
-        """
 
-        self.parent = parent
-        self.children: List[Player] = []
-        self.model_parameters = model_parameters
+class PlayerAutoIdHook(Hook):
 
-        # All the other models this transition depended on
-        # (opponents/allies for RL, other parent in genetics...)
-        self.contributors = contributors
-        #
+    def __call__(
+        self, repo: Repository, player: Player,
+        *args, **kwds
+    ):
+        if player.id is not None:
+            return player.id
 
-        self.id_str = id_str
-        self.generation: int = generation
-        self.timestep: int = timestep
+        parent = player.parent
+        path = parent.id + str(id(player))  # Avoid conflicts with siblings
+        player.id = sha1(path.encode()).hexdigest()
+        # player.path = f"{parent.path}/{player.id}"
 
-        # Parameters to reproduce evolution from parent
-        self.hyperparameters: Dict[str, Any] | None = hyperparameters
 
-        self.branch_name = branch_name
+@dataclass
+class MetaNode:
+    player: Player
+    parent: 'MetaNode'
+    descendants: List['MetaNode']
+    interaction: Optional[Interaction] = None
+    generation: Optional[int] = 0
+    timestep: Optional[int] = 1
+    branch: Optional[str] = 0
+    id: str = None
 
-    def add_child(self, model_parameters=None,
-                  id_str: str = '',
-                  hyperparameters: Dict[str, Any] | None = None,
-                  contributors: 'List[Player] | None' = None,
-                  new_generation: bool = True,
-                  timestep: int = 1,
-                  branch_name: str = '') -> 'Player':
+    def __post_init__(self):
+        if self.player is not None:
+            self.id = self.player.id
 
-        """Adds a child to this node
+    def add_descendant(
+        self,
+        player: Player,
+        interaction: Optional['Interaction'] = None,
+        timestep: Optional[int] = 1,
+        branch: Optional[str] = None
+    ) -> 'Player':
+
+        """Adds a decendant to this node
 
         If `node` is directly specified then it will be added as a child.
         Otherwise, the other parameters will be used to create a new node
@@ -102,7 +91,7 @@ class Player:
                 reproduce the evolution step deterministically given the
                 parent and contributors parameters.
                 Defaults to an empty dict.
-            contributors (List[PhylogeneticTree.Node]): All the models
+            interaction (List[Player]): All the models
                 other than the parent that contributed to the evolution.
                 Typically, that would be opponents and allies, or mates in
                 the case of genetic crossover.
@@ -112,48 +101,40 @@ class Player:
                 opponent. Defaults to an empty list.
 
         Returns:
-            PhylogeneticTree.Node: The new child
+            Player: The new descendant
 
-        Raises:
-            ValueError: If the id_str conflicts with an other node in the tree.
         """
 
-        branch_name = self.branch_name if branch_name == '' else branch_name
+        branch = self.branch if branch is None else branch
 
         # Create child node
-        child = Player(
-            self,
-            id_str=id_str,
-            model_parameters=model_parameters,
-            hyperparameters=hyperparameters,
-            contributors=contributors,
-            generation=self.generation+1,
+        descendant = MetaNode(
+            player=player,
+            parent=self,
+            interaction=interaction,
+            generation=self.generation + 1,
             timestep=timestep,
-            branch_name=branch_name)
+            branch=branch
+        )
 
-        if new_generation:
-            child.generation = self.generation + 1
-        else:
-            child.generation = self.generation
+        self.descendants.append(descendant)
 
-        self.children.append(child)
-
-        return child
-
-    def has_child(self) -> bool:
-        return len(self.children) > 0
-
-    def load_model_parameters(self, load_hook: Callable[[str], Any]):
-        return load_hook(self.id_str)
+        return descendant
 
 
 class Population:
-    """A data structure to manipulate evolving populations of agents.
+    """A data structure to manipulate evolving populations of players.
     The structure is meant to be similar to that of a git repository, where
-    every branch corresponds to an agent."""
+    every commit corresponds to an agent."""
 
-    def __init__(self, root_id="_root"):
-        """Instantiates population of agents.
+    def __init__(
+        self,
+        root: Optional[MetaNode] = None,
+        root_name: str = "_root",
+        root_branch: str = "main",
+        stage: 'Optional[Repository[MetaNode]]' = '.popcache',
+    ):
+        """Instantiates population of players.
 
         This is a data structure that records the evolution of populations of
         agents. It behaves like a git repository, where each branch is a
@@ -165,321 +146,168 @@ class Population:
         but rather create a branch for every new agent.
         """
 
-        self._root = Player(id_str=root_id, branch_name=root_id)
+        root = root if root else MetaNode(
+            player=None, parent=None, branch=root_branch
+        )
+        self._root = root
 
-        # A dictionary containing all commits in the tree
-        # Multiple keys may refer to the same commit. In particular, branches
-        # are aliases to specific commits
-        self.nodes: Dict[str, Player] = {root_id: self._root}
+        self.repo = Repository[Player](
+            stage=stage,
+            pre_commit_hooks=[PlayerAutoIdHook()],
+            serializer=PlayerKeyValueSerializer()
+        )
+
+        self.repo.commit(root_name, self._root)
+        self.repo.branch(root_branch, self._root)
 
         # An array of every node indexed by generation (1st gen has index 0)
-        self.generations: List[List[Player]] = [[]]
+        # self._generations: List[List[Player]] = [[]]
 
-        self.current_node: Player = self._root
-        self.current_branch: str = root_id
+        self._player: Player = self._root
+        self._branch: str = self._root.branch
 
-        self.branches: Set[str] = set([root_id])
-
-    def __generate_id(self, id_str: str = '', node: Player | None = None
-                      ) -> str:
-        """Generate random unique id_str for a new node/commit
-
-        Args:
-            id_str (str): The id_str we want the new node to have. If this is
-                the empty string, one will be generated using sha1. Defaults to
-                the empty string.
-
-        Raises:
-            ValueError: If a commit with the specified id_str already exists"""
-
-        if id_str != '':
-            return id_str
-
-        if node is None:
-            node = self.current_node
-        path = ''
-        while node is not None:
-            path += str(node)
-            node = node.parent
-        id_str = sha1(path.encode()).hexdigest()
-
-        return id_str
-
-    def __add_gen(self, player):
-        if len(self.generations) <= player.generation:
-            self.generations.append([])
-        self.generations[player.generation].append(player)
-
-    def commit(self, model_parameters: Any = None,
-               hyperparameters: Dict[str, Any] | None = None,
-               contributors: 'List[Player] | None' = None,
-               id_str: str = '',
-               timestep: int = 1,
-               id_hook: Callable[[str], str] = lambda x: x,
-               player_hook: Callable[[Player], Player] = lambda x: x,
-               persist_hook: Callable[[str, Player], None] = lambda x, y: None
-               ) -> str:
+    def commit(
+        self,
+        id: str = None,
+        interaction: "Interaction | None" = None,
+        timestep: int = 1,
+        **kwargs
+    ) -> str:
         """Creates a new commit in the current branch.
 
-        Args:
-            model_parameters (Any): The parameters of the model to commit.
+        Args: TODO:
+            parameters (Any): The parameters of the model to commit.
                 Defaults to None
             hyperparameters (Dict[str, Any]): The hyperparameters to commit.
                 Defaults to an empty dict.
-            contributors (List[Player]): The agents other than the parent that
+            interaction (Interaction): The agents other than the parent that
                 contributed to the last training step (opponents, allies,
                 mates...). Defaults to an empty list.
-            id_str (str): A unique identifier for the commit (like the commit
-                hash in git). If this is the empty string, an id_str will be
-                generated using sha1. This value must be unique in the
-                Population to uniquely identify each commit. Defaults to the
-                empty string
-            id_hook (Callable[[str], str]): A function that takes id_str if
-                provided, or the automatically generated hash if not, and
-                returns a new id_str. This will be the hash of the commit,
-                hence the result must be unique. This is meant to allow user
-                to customize population indexing. Defaults to the identity
-                function.
-            player_hook (Callable[[Player], Player]): A function that takes
-                the newly created Player object and returns a new one to be
-                added to the population instead. This is meant to allow users
-                to customize player creation. Defaults to the identity
-                function.
-            persist_hook (Callable[[str, Player], Player]): A function that
-                takes the commit id_str and newly created Player object to
-                save the corresponding model. This is meant to allow users
-                to save any model they may be using. If it is provided, it
-                will be called, so only give this argument if you want that
-                specific version of the model to persist. Defaults to the None
-                function.
+            name (str): A unique identifier for the commit (like the commit
+                hash in git). If this is None, an unique name will be
+                generated using cryptographic hashing. Defaults to None
+            pre_commit_hooks (List[PreCommitHooks]):
+            post_commit_hooks (List[PostCommitHooks]):
 
         Raises:
-            ValueError: If a commit with the specified id_str already exists
+            ValueError: If a player with the specified name already exists
 
         Returns:
             str: The id_str of the new commit.
         """
-
+        if self.repo.exists(id):
+            raise ValueError(POPULATION_COMMIT_EXIST.format(id))
         # Create the child node
-        child = self.current_node.add_child(
-            id_str=id_str,
-            model_parameters=model_parameters,
-            hyperparameters=hyperparameters,
-            contributors=contributors,
+        next_player = self._player.add_descendant(
+            id=id,
+            interaction=interaction,
             timestep=timestep,
-            branch_name=self.current_branch)
+            branch=self._branch
+        )
 
-        id_str = self.__generate_id(id_str, child)
-        id_str = id_hook(id_str)
+        if self.repo.exists(next_player.id):
+            raise ValueError(POPULATION_COMMIT_EXIST.format(id))
 
-        if id_str in self.nodes.keys():
-            raise ValueError(f"A commit with id_str {id_str} already exists. "
-                             "Every commit must have unique id_str")
+        self.repo.commit(next_player.id, next_player)
+        self.repo.branch(self._branch, next_player)
 
-        child.id_str = id_str
+        self._player = next_player
 
-        child = player_hook(child)
+        return next_player.id
 
-        # Update the dict of nodes
-        self.nodes[id_str] = child
-
-        self.__add_gen(child)
-
-        self.current_node = child
-        self.nodes[self.current_branch] = self.current_node
-
-        persist_hook(id_str, child)
-
-        return id_str
-
-    def branch(self, branch_name: str, auto_rename: bool = False) -> str:
+    def branch(self, name: str = None) -> str:
         """Create a new branch diverging from the current branch.
 
         Args:
-            branch_name (str): The name of the new branch. Must be unique.
-                This will be a new alias to the current commit
-            auto_rename (bool): If True, a number will be appended to the
-                branch name in case of conflict to automatically resolve it.
-                Defaults to False.
+            name (str): The name of the new branch. Must be unique.
+                This will be a new alias to the current commit. If None, it
+                returns the name of the active branch
 
         Raises:
-            ValueError: If a commit with the specified id_str already exists
+            ValueError: If a player with the specified name/alias already
+            exists
 
         Returns:
-            str: The id_str of the new commit"""
+            str: The name of the new commit"""
 
-        if branch_name in self.nodes.keys():
-            if not auto_rename:
-                raise ValueError(f"A branch with the name '{branch_name}' "
-                                 "already exists")
-            i = 1
-            new_branch_name = branch_name + str(i)
-            while new_branch_name in self.nodes.keys():
-                i += 1
-                new_branch_name = branch_name + str(i)
-            branch_name = new_branch_name
+        if name is None:
+            return self._branch
 
-        self.nodes[branch_name] = self.current_node
-        self.branches.add(branch_name)
+        if self.repo.exists(name):
+            raise ValueError(POPUPLATION_BRANCH_EXISTS.format(name))
 
-        return branch_name
+        self.repo.branch(name, self._player)
 
-    def checkout(self, branch_name: str) -> None:
+        return self.checkout(name)
+
+    def checkout(self, name: str) -> str:
         """Set the current branch to the one specified.
 
         Args:
-            branch_name (str): The name of the branch to switch to.
+            name (str): The name of the branch or player to switch to.
 
         Raises:
-            KeyError: If there is no branch with the specified name"""
+            ValueError: If there is no branch with the specified name"""
 
-        if branch_name not in self.nodes.keys():
-            raise KeyError(f"A branch with name '{branch_name}' does not"
-                           " exist")
+        if not self.repo.exists(name):
+            raise ValueError(POPULATION_PLAYER_NOT_EXIST.format(name))
 
-        self.current_node = self.nodes[branch_name]
-
-        if branch_name in self.branches:
-            self.current_branch = branch_name
+        if name in self.repo._branches:
+            self._branch = name
+            self._player: Player = self.repo.commit(
+                self.repo.branch(name)
+            )
         else:
-            self.current_branch = self.current_node.branch_name
+            self._player: Player = self.repo.commit(name, None)
+            self._branch = self._player.branch
 
-    def get_model_parameters(self):
-        """Return the model parameters in the last commit of the current
-        branch"""
-        return self.current_node.model_parameters
+        return self._branch
 
-    def __get_commit(self, id_str: str = "") -> Player:
-        """Returns the commit with the given id_str if it exists.
+    def branches(self) -> Set[str]:
+        """Returns a set of all branches"""
+        return set(self.repo._branches)
 
-        Args:
-            id_str (str): The id_str of the commit we are trying to get. If
-                id_str is the empty string, returns the latest commit of the
-                current branch. Defaults to the empty string.
+    def head(self) -> 'Player':
+        return self._player
 
-        Raises:
-            KeyError: If a commit with the specified id_str does not exist"""
-
-        if id_str == "":
-            return self.current_node
-
-        if id_str not in self.nodes.keys():
-            raise KeyError(f"The commit {id_str} does not exist")
-
-        return self.nodes[id_str]
-
-    def __get_commits(self, id_strs: List[str]) -> List[Player]:
-        """Returns the commit with the given id_str if it exists.
-
-        Args:
-            id_strs (List[str]): The id_str of the commits we are trying to
-                get.
-
-        Raises:
-            KeyError: If a commit with one of the specified id_str does not
-                exist
-        """
-
-        return [self.__get_commit(c) for c in id_strs]
-
-    def __get_commit_history(self, id_str: str = "") -> List[str]:
-        """Returns a list of all id_str of commits that came before the one
-        with specified id_str.
-
-        If id_str is not specified, it will return the commit history of the
-        latest commit of the current branch.
-        The list is of all commits that led to the specified commit. This
-        means that commits from sister branches will not be included even if
-        they may be more recent. However commits from ancestor branches would
-        be included, up to _root.
-
-        The list returned is in inverse chronological order, so the most
-        recent commit appears first, and the oldest last."""
-
-        commit: None | Player  # Mypy cries if I don't specify that
-
-        if id_str == "":
-            commit = self.current_node
-        else:
-            if id_str not in self.nodes.keys():
-                raise KeyError(f"The commit {id_str} does not exist")
-            commit = self.nodes[id_str]
-
-        history = [commit.id_str]
-        commit = commit.parent
-        while commit is not None:
-            history.append(commit.id_str)
-            commit = commit.parent
-
-        return history
-
-    def __get_descendents(self, id_str: str = "") -> List[str]:
-        """Returns a list of all id_str of commits that came after the one
-        with specified id_str, including branches.
-
-        If id_str is not specified, it will default to the current commit.
-        The list is of all commits that originate from the specified commit.
-
-        The list returned is in no particular order."""
-
-        commit: None | Player  # Mypy cries if I don't specify that
-
-        if id_str == "":
-            commit = self.current_node
-        else:
-            if id_str not in self.nodes.keys():
-                raise KeyError(f"The commit {id_str} does not exist")
-            commit = self.nodes[id_str]
-
-        history = [commit.id_str]
-        for c in commit.children:
-            history.extend(self.__get_descendents(c.id_str))
-
-        return history
-
-    def walk_lineage(self, branch: str = "") -> Iterator[Player]:
-        """Returns an iterator with the commits in the given lineage"""
-        lineage = self.__get_commit_history(branch)[:-1]
-        for i in self.__get_commits(lineage):
-            yield i
-
-    def walk_gen(self, gen: int = -1) -> Iterator[Player]:
-        """Returns an iterator with the commits in the given generation"""
-        for i in self.generations[gen]:
-            yield i
-
-    def walk(self) -> Iterator[Player]:
-        """Returns an iterator with all the commits in the population"""
-        lineage = self.__get_descendents(self._root.id_str)[1:]
-        for i in self.__get_commits(lineage):
-            yield i
-
-    def get_branches(self) -> Set[str]:
-        """Return a set of all branches"""
-        return self.branches
-
-    def get_current_branch(self) -> str:
-        """Return the name of the current branch"""
-        return self.current_branch
-
-    def detach(self) -> 'Population':
-        """Creates a Population with the current commit's id_str as root_id.
+    def detach(
+        self,
+    ) -> 'Population':
+        """Creates a Population with the current player as root.
 
         The new Population does not have any connection to the current one,
         hence this should be thread-safe. This may then be reattached once
         operations have been performed.
 
         Returns:
-            Population: A new population with the current commit's id_str as
-            root_id.
+            Population: A new population with the current player as
+            root.
         """
-
-        detached_pop = Population(root_id=self.current_node.id_str)
+        # TODO: detach persistence
+        detached_pop = Population(
+            root=self._player,
+            pre_commit_hooks=self._pre_commit_hooks,
+            post_commit_hooks=self._post_commit_hooks,
+            attach_hooks=self._attach_hooks,
+        )
         return detached_pop
 
-    def attach(self, population: 'Population',
-               id_hook: Callable[[str], str] = lambda x: x,
-               auto_rehash: bool = False) -> None:
+    def delete(self):
+        self.repo.delete()
+        self._player = None
+        self._branch = None
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exctype, excinst, exctb) -> bool:
+        self.delete()
+        return False
+
+    def attach(
+        self,
+        population: 'Population',
+    ) -> None:
         """Merges back a previously detached population.
 
         Colliding branch names will have a number appended to fix the
@@ -510,60 +338,84 @@ class Population:
             ValueError: If there is a collision between commit id_str.
         """
 
-        # Warning: If a model is saved in a detached pop, and the pop is then
-        # reattached, the re-hashing of the commits might make the model not
-        # loadable anymore since the id_str changed (so in case either id_hook
-        # is provided ot auto_rehash is true)
+        # TODO Warning: If a model is saved in a detached pop, and the pop is
+        # then reattached, the re-hashing of the commits might make the model
+        # not loadable anymore since the name changed
 
-        if population._root.id_str not in self.nodes.keys():
-            raise ValueError("The population's root's id_str does not match "
-                             "any known commit, hence it cannot be attached")
+        # TODO: attach persistence
+        if population._root.id not in self.repo:
+            raise ValueError(POPULATION_PLAYER_NOT_EXIST.format(
+                population._root.id))
 
-        node = self.nodes[population._root.id_str]
+        # Pick the right place to reattach
+        node: Player = self.repo[population._root.id]
 
-        for x in population._root.children:
-            node.children.append(x)
-            x.parent = node
+        # Transfer all the nodes from the other pop to the right place
+        for player in population._root.descendants:
+            node.descendants.append(player)
+            player.parent = node
 
         nodes_to_add = {}
+
+        # Rename branches in attached pop to avoid conflicts
+        branches_to_add, branch_renaming = self._rename_conflicting_branches(
+            population
+        )
+
+        for name, player in population.repo.items():
+            # Ignore root node
+            if name == population._root.id:
+                continue
+
+            # Add the renamed branches to the main pop
+            if name in population._branches:
+                nodes_to_add[branch_renaming[name]] = player
+                continue
+
+            # Apply branch renaming
+            player.branch = branch_renaming[player.branch]
+
+            player.generation += node.generation
+
+            if player.name is None:
+                # TODO: This seems incomplete
+                node = player
+                path = ''
+                while node is not None:
+                    path += str(node)
+                    node = node.parent
+
+            if name in self.repo:
+                raise ValueError(POPULATION_COMMIT_EXIST.format(name))
+
+            # Add player to the index
+            self._nodes[player.name] = player
+
+            self._add_gen(player)
+
+        # Add branches to the index
+        self._nodes.update(nodes_to_add)
+        self._branches = self._branches.union(branches_to_add)
+
+    @property
+    def stage(self):
+        return self.repo._stage
+
+    def _rename_conflicting_branches(self, population: 'Population'):
+        """Every branch that generates a conflict gets renamed by adding an
+        integer at the end"""
+
         branches_to_add = set()
         branch_renaming = {}
 
-        for branch in population.branches:
+        for branch in population._branches:
             new_branch = branch
             i = 1
-            while new_branch in self.nodes.keys():
+            while self._index.exists(new_branch):
                 new_branch = branch + str(i)
                 i += 1
 
             branches_to_add.add(new_branch)
             branch_renaming[branch] = new_branch
 
-        for id_str, player in population.nodes.items():
-
-            if id_str == population._root.id_str:
-                continue
-
-            if id_str in population.branches:
-                nodes_to_add[branch_renaming[id_str]] = player
-                continue
-
-            new_id_str = id_str
-
-            if auto_rehash:
-                new_id_str = self.__generate_id('', player)
-
-            new_id_str = id_hook(new_id_str)
-            player.id_str = new_id_str
-            player.branch_name = branch_renaming[player.branch_name]
-
-            if id_str in self.nodes.keys():
-                raise ValueError("Collision between id_str of commits from "
-                                 "both populations.")
-
-            self.nodes[player.id_str] = player
-
-            self.__add_gen(player)
-
-        self.nodes.update(nodes_to_add)
-        self.branches = self.branches.union(branches_to_add)
+        return branches_to_add, branch_renaming

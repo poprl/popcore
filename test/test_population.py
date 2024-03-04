@@ -1,207 +1,113 @@
 import unittest
+from popcore._core import Interaction
 from popcore.population import Population
-import random
-
-# Display libraries
-import networkx as nx                                   # type: ignore
-import matplotlib.pyplot as plt                         # type: ignore
-from networkx.drawing.nx_pydot import graphviz_layout   # type: ignore
-
-# TODO: Write some doc to explain the tests
-
-
-def draw(population: Population) -> None:  # TODO: Move that
-
-    """Displays the phylogenetic tree.
-
-    Only parental edges are shown, contributors are ignored."""
-
-    G = nx.Graph()
-    G.add_nodes_from(population.nodes.keys())
-
-    queue = [population._root]
-
-    while len(queue):
-        node = queue[0]
-        queue = queue[1:]
-
-        for c in node.children:
-            G.add_edge(node.id_str, c.id_str)
-            queue.append(c)
-
-    pos = graphviz_layout(G, prog="dot")
-    nx.draw_networkx(G, pos, labels={x.id_str: x.model_parameters
-                                     for x in population.nodes.values()})
-    plt.show()
 
 
 class TestPopulation(unittest.TestCase):
 
-    def mutate(parent_parameters, hyperparameters, contributors=[]):
-        """Mutate a strand of DNA (replace a character in the str at random)"""
-        new_DNA = list(parent_parameters)
-        new_DNA[hyperparameters["spot"]] = hyperparameters["letter"]
-        new_DNA = ''.join(new_DNA)
-        return new_DNA, hyperparameters
+    def test_init_with_default_args(self):
+        with Population() as pop:
+            self.assertEqual(pop.head(), pop._root)
+            self.assertEqual(pop.head().id, "_root")
 
-    def test_visual_construction(self):
-        """Tree tracking the evolution of a strand of DNA along 3 evolutionary
-        paths"""
-        # Visual test, uncomment the last line to see what the resulting trees
-        # look like and check that they make sense.
+    def test_init_with_root_name(self):
+        with Population(root_name="root beer") as pop:
+            self.assertEqual(pop.head(), pop._root)
+            self.assertEqual(pop.head().id, "root beer")
 
-        pop = Population()
-        # tree.add_root("GGTCAACAAATCATAAAGATATTGG")  # Land snail DNA
-        new_DNA = "OOOOO"
-        pop.branch("Lineage 1")
-        pop.branch("Lineage 2")
-        pop.branch("Lineage 3")
+    def test_init_with_nondefault_stagedir(self):
+        with Population(stage=".poptemp") as pop:
+            self.assertEqual(pop.head(), pop._root)
+            self.assertEqual(pop.head().id, "_root")
+            self.assertEqual(pop.stage, ".poptemp")
 
-        pop.checkout("Lineage 1")
-        pop.commit(model_parameters=new_DNA)
+    def test_branch_noargs_should_return_current(self):
+        with Population() as pop:
+            branch = pop.branch()
 
-        pop.checkout("Lineage 2")
-        pop.commit(model_parameters=new_DNA)
+            self.assertEqual(branch, "main")
+            self.assertEqual(pop.branches(), set(["main"]))
 
-        pop.checkout("Lineage 3")
-        pop.commit(model_parameters=new_DNA)
+    def test_branch_with_name_should_create_branch(self):
+        with Population() as pop:
+            branch = pop.branch("branch1")
+            self.assertEqual(branch, "branch1")
+            self.assertEqual(pop.branches(), set(["main", "branch1"]))
 
-        for _ in range(32):
-            branch = random.choice(list(pop.branches))
+    def test_branch_should_raise_if_branch_exists(self):
+        with Population() as pop:
+            pop.branch("branch1")
+            self.assertRaises(ValueError, pop.branch, "branch1")
 
-            if branch == "_root":
-                continue
+    def test_branch_should_raise_if_name_protected_main(self):
+        with Population() as pop:
+            self.assertRaises(ValueError, pop.branch, "main")
 
-            letter = random.choice("ACGT")
-            spot = random.randrange(len(new_DNA))
+    def test_branch_should_raise_if_name_on_index(self):
+        with Population() as pop:
+            self.assertRaises(ValueError, pop.branch, "_root")
 
-            pop.checkout(branch)
+    def test_checkout_branch_should_return_checkout_branch(self):
+        with Population() as pop:
+            pop.branch("b1")
+            pop.checkout("main")
 
-            hyperparameters = {"letter": letter, "spot": spot}
-            new_DNA, _ = TestPopulation.mutate(pop.get_model_parameters(),
-                                               hyperparameters)
+            self.assertEqual(pop.branch(), "main")
 
-            pop.commit(model_parameters=new_DNA,
-                       hyperparameters=hyperparameters)
+    def test_checkout_should_change_branch_if_branch(self):
+        with Population() as pop:
+            pop.branch("b1")
+            pop.checkout("b1")
 
-        # draw(pop)
+            self.assertEqual(pop.branch(), "b1")
 
-    def test_linear(self):
-        """This tests the correctness of the case where the population consists
-        of only a single lineage"""
-        pop = Population()
+    def test_checkout_should_raise_if_branch_not_exist(self):
+        with Population() as pop:
+            pop.branch("b1")
 
-        new_DNA = "OOOOO"
-        DNA_history = [new_DNA]
+            self.assertRaises(ValueError, pop.checkout, "b2")
 
-        pop.commit(model_parameters=new_DNA)
+    def test_should_commit_without_arguments(self):
+        with Population() as pop:
+            pop.commit()
+            self.assertIsNone(pop.head().interaction)
+            self.assertEqual(pop.head().timestep, 1)
+            self.assertNotEqual(pop.head().id, None)
 
-        for x in range(16):
-            letter = random.choice("ACGT")
-            spot = random.randrange(len(new_DNA))
+    def test_should_store_interaction(self):
+        interaction = Interaction(["p1", "p2"], [1, 0])
 
-            hyperparameters = {"letter": letter, "spot": spot}
-            new_DNA, _ = TestPopulation.mutate(new_DNA,
-                                               hyperparameters)
-            DNA_history.append(new_DNA)
+        with Population() as pop:
+            pop.commit(interaction=interaction)
+            self.assertEqual(pop.head().interaction, interaction)
+            self.assertEqual(pop.head().timestep, 1)
+            self.assertNotEqual(pop.head().id, None)
 
-            pop.commit(model_parameters=new_DNA,
-                       hyperparameters=hyperparameters)
+    def test_should_commit_with_provided_id(self):
+        with Population() as pop:
+            pop.commit(id="Helloo")
 
-        # draw(pop)
+            self.assertIsNone(pop.head().interaction)
+            self.assertEqual(pop.head().timestep, 1)
+            self.assertEqual(pop.head().id, 'Helloo')
 
-        nbr_nodes = 1
-        node = pop._root
-        while len(node.children):
-            nbr_nodes += 1
-            assert len(node.children) == 1
-            node = node.children[0]
-            assert node.model_parameters == DNA_history[nbr_nodes-2]
+    def test_should_raise_when_repeated_id(self):
+        with Population() as pop:
+            pop.commit(id="Helloo")
+            self.assertRaises(ValueError, pop.commit, id="Helloo")
 
-        assert nbr_nodes == 18
+    def test_should_raise_with_internal_id(self):
+        with Population() as pop:
+            self.assertRaises(ValueError, pop.commit, id="_root")
 
-    def test_nonlinear(self):
-        """This tests the case where the population has multiple branches at
-        different generations"""
-        pop = Population()
-        pop.branch("b1")
-        pop.checkout("b1")
-        pop.commit("1")
-        pop.branch("b2")
-        pop.checkout("b2")
-        pop.commit("2")
-        pop.commit("3")
-        pop.checkout("_root")
-        pop.branch("b3")
-        pop.checkout("b3")
-        pop.commit("4")
-        pop.checkout("b1")
-        pop.commit("5")
+    def test_should_raise_with_existing_branch(self):
+        with Population() as pop:
+            self.assertRaises(ValueError, pop.commit, id="main")
 
-        # draw(pop)
+    def test_should_store_timestep(self):
+        with Population() as pop:
+            pop.commit(timestep=2)
 
-        pop.checkout('b2')
-        self.assertSetEqual(set(pop.get_branches()),
-                            set(["_root", "b1", "b2", "b3"]))
-        self.assertEqual(len(pop.get_branches()), len(set(pop.get_branches())))
-
-        self.assertEqual(pop.get_current_branch(), "b2")
-
-        self.assertEqual(len([x for x in pop.walk_lineage()]), 3)
-
-    def test_detach(self):
-        """This tests the correctness of the detach/attach operations"""
-        pop = Population()
-        pop.branch("b1")
-        pop.branch("b2")
-        pop.checkout("b1")
-        a = pop.commit(1)
-        pop.commit(2)
-        pop.checkout(a)
-        pop.commit(3)
-        pop.checkout("_root")
-        pop.branch("b3")
-        pop.checkout('b2')
-        pop.commit(4)
-        pop.commit(5)
-        pop.commit(6)
-        pop.branch("b4")
-        pop.commit(7)
-        pop.checkout("b4")
-        pop.commit(8)
-        pop.checkout("b3")
-        a = pop.commit(9)
-        b = pop.commit(15)
-        pop.checkout(a)
-
-        pop2 = pop.detach()
-        pop2.branch("b1")
-        pop2.checkout("b1")
-        c = pop2.commit(10)
-        pop2.commit(11)
-        pop2.branch("b3")
-        pop2.commit(12)
-        pop2.checkout("b3")
-        pop2.commit(13)
-        pop2.checkout(pop2._root.id_str)
-        d = pop2.commit(14)
-
-        self.assertEqual(len(pop2.branches), 3)
-        self.assertEqual(len(pop2.nodes), 8)
-
-        self.assertEqual(len(pop.branches), 5)
-        self.assertEqual(len(pop.nodes), 15)
-
-        # draw(pop)
-        # draw(pop2)
-
-        pop.attach(pop2, auto_rehash=False)
-
-        # draw(pop)
-
-        self.assertEqual(len(pop.branches), 8)
-        self.assertEqual(len(pop.nodes), 22)
-
-        pop.checkout(a)
-        self.assertListEqual(
-            [x.id_str for x in pop.current_node.children], [b, c, d])
+            self.assertIsNone(pop.head().interaction)
+            self.assertEqual(pop.head().timestep, 2)
+            self.assertNotEqual(pop.head().id, '')
