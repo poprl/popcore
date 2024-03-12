@@ -13,7 +13,7 @@ class TestInteraction(unittest.TestCase):
 
         self.assertEqual(
             [interaction],
-            interaction.as_pairs()
+            interaction.to_pairwise()
         )
 
     def test_conversion_to_pairwise_should_split(self):
@@ -30,5 +30,5 @@ class TestInteraction(unittest.TestCase):
 
         self.assertListEqual(
             pairwise,
-            interaction.as_pairs()
+            interaction.to_pairwise()
         )

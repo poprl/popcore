@@ -28,6 +28,7 @@ class Player:
 
 
 PlayerLike = Union[Player, str]
+PlayerType = TypeVar("PlayerType", bound=PlayerLike)
 
 
 @dataclass
@@ -85,7 +86,7 @@ class Interaction(Generic[GameOutcome]):
     def order(self) -> int:
         return self._players.shape[-1]
 
-    def as_pairs(self) -> 'List[Interaction]':
+    def to_pairwise(self) -> 'List[Interaction]':
         """
            Use this method to converts the current, possibly multiplayer,
            multioutcome interaction into a set of pairwise interactions.
@@ -167,9 +168,6 @@ class TimedIntereaction(Interaction[GameOutcome]):
         return f"TimedInteraction(step={self.timestep}, interaction={rep})"
 
 
-PlayerType = TypeVar("PlayerType", bound=PlayerLike)
-
-
 class Population(Generic[PlayerType]):
     """
         The Population class implements a storage for any collection
@@ -221,7 +219,7 @@ class Population(Generic[PlayerType]):
         return self._size
 
     def __iter__(self):
-        return self.players
+        return iter(self.players)
 
     def __str__(self) -> str:
         return self.uid
@@ -259,13 +257,10 @@ class Population(Generic[PlayerType]):
         """
         # TODO: implement exception handling here.
         assert cls == Population, "Do not call from subclasses"
-
-        population = Population[PlayerType](uid)
-        for player_id in players_uid:
-            population.add(
-                Player(player_id)
-            )
-        return population
+        return Population[PlayerType](
+            uid,
+            [Player(player_id) for player_id in players_uid]
+        )
 
     @classmethod
     def from_players_interactions(
